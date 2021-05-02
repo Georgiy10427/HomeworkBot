@@ -7,9 +7,22 @@ CREATE TABLE IF NOT EXISTS posts(
   body TEXT NOT NULL
 );
 """
+create_subscribers_table = """
+CREATE TABLE IF NOT EXISTS subscribers(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  USER_ID TEXT NOT NULL
+);
+"""
 create_posts = """
 INSERT INTO
   posts (body)
+VALUES
+  ('%s');
+"""
+
+add_subscriber = """
+INSERT INTO
+  subscribers (USER_ID)
 VALUES
   ('%s');
 """
@@ -45,7 +58,7 @@ def execute_read_query(connection, query):
 def AddPost(connection, text):
     execute_query(connection, create_posts % text)
 
-def CreateTable(connection):
+def CreatePostsTable(connection):
     execute_query(connection, create_posts_table)
 
 def Connect(filename):
@@ -72,3 +85,23 @@ def DeleteFromId(connection, id):
 
 def DeleteAllLabels(connection):
     execute_query(connection, "DELETE FROM posts")
+
+def CreateSubscribersTable(connection):
+    execute_query(connection, create_subscribers_table)
+
+def Subscribe(connection, USER_ID):
+    execute_query(connection, add_subscriber % USER_ID)
+
+def Unsubscribe(connection, USER_ID):
+    execute_query(connection, "DELETE FROM subscribers WHERE USER_ID = " + str(USER_ID))
+
+def IsSubscriber(connection, USER_ID):
+    QueryValue = execute_read_query(connection, "SELECT * FROM subscribers WHERE USER_ID = " + str(USER_ID))
+    if len(QueryValue) == 0:
+        return False
+    else:
+        return True
+        
+def GetSubscribers(connection):
+    QueryValue = execute_read_query(connection, "SELECT * from subscribers")
+    return QueryValue
