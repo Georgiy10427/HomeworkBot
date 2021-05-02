@@ -4,7 +4,7 @@
 ![Image alt](https://github.com/Georgiy10427/HomeworkBot/blob/main/screenshot.png)
 
 # Попробовать бота
-Вы можете протестировать работу данного кода на примере бота (@AllHomework_bot)[https://t.me/AllHomework_bot] в телеграмме. 
+Вы можете протестировать работу данного кода на примере бота [@AllHomework_bot](https://t.me/AllHomework_bot) в телеграмме. 
 # Установка
 
 ## 1. Создаём бота в Telegram
