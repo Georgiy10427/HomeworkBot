@@ -86,7 +86,7 @@ async def process_start_command(message: types.Message):
 #Обработчик команды /about
 @dp.message_handler(commands=['about'])
 async def process_about_command(message: types.Message):
-    await message.reply(aboutMSG)
+    await message.reply(aboutMSG, reply_markup=CloseButton)
 
 #Обработчик команды /notifications
 @dp.message_handler(commands=['notifications'])
@@ -121,7 +121,7 @@ async def answer(message: types.Message):
                 await message.reply("Удалено. Удалённый пост: \n" + post[-1][1])
             except:
                 await message.reply("Возникла ошибка :( \nВозможно, данная публикация не существует ¯\\_(ツ)_/¯")
-    else:
+    else: #Можно удалить, т. к. использовать текстовые команды, которые нигде не объявлены пользователь вряд-ли будет использовать
         for subject in subjects_names:
             if subject in command:
                 search_request = subject
@@ -210,5 +210,6 @@ def get_subject(subject):
     except:
         return "Ошибка: не удалось выполнить поиск!"
 
+#Запускаем бота
 if __name__ == '__main__':
 	executor.start_polling(dp, skip_updates=True)
