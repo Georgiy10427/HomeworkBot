@@ -1,7 +1,6 @@
 # HomeworkBot
 Чат-бот позволяет узнать текущие домашнее задание по нужному предмету, всего в пару кликов. 
 
-![Image alt](https://github.com/Georgiy10427/HomeworkBot/blob/main/screenshot.png)
 
 # Установка
 
