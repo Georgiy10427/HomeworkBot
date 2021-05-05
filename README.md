@@ -17,9 +17,13 @@
 На компьютере должен быть установлен минимум Python 3.8 или выше. Если вы сами собираете Python, то он должен быть собран [с поддержкой sqlite](https://stackoverflow.com/questions/1210664/no-module-named-sqlite3). 
 
 Возможно, вам понадобится установить дополнительные зависимости:
-**GNU/Linux**: ```sudo apt-get install python3-dev```
+
+**GNU/Linux**: 
+
+```sudo apt-get install python3-dev```
 ```pip3 install wheel```
 ```pip3 install setuptools```
+
 Для самосборной версии Python подставьте нужную версию в команды выше. 
 
 Установите библиотеку aiogram:
