@@ -44,7 +44,7 @@ pip3.8 install aiogram
 #### 3.1 Загрузка кодов бота
 Скачайте [исходные коды](https://github.com/Georgiy10427/HomeworkBot/archive/refs/heads/main.zip) бота в виде архива и распакуйте его куда-нибудь. 
 Или используйте git (если он установлен):  
-``` git clone https://github.com/Georgiy10427/HomeworkBot.git ``` 
+``` git clone https://github.com/Georgiy10427/HomeworkBot.git ```  
 Проверьте, что все [зависимости на сервере установленны](https://github.com/Georgiy10427/HomeworkBot#2-%D1%83%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0-%D0%B7%D0%B0%D0%B2%D0%B8%D1%81%D0%B8%D0%BC%D0%BE%D1%81%D1%82%D0%B5%D0%B9). 
 #### 3.2 Настройка бота 
 В папке с исходными кодами найдите файл config.py и подставьте туда свой API Token, ранее полученный в шаге 1. В итоге значение API_TOKEN в файле config.py должно выглядеть примерно так:
