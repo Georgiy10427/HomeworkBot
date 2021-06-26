@@ -18,9 +18,9 @@
 
 Возможно, вам понадобится установить дополнительные зависимости:
 
-**GNU/Linux**: 
-```sudo apt-get install gcc```  
-```sudo apt-get install python3-dev```  
+**GNU/Linux**:  
+```sudo apt-get install gcc -y```  
+```sudo apt-get install python3-dev -y```  
 ```pip3 install wheel```  
 ```pip3 install setuptools```  
 
@@ -78,8 +78,8 @@ ssh ИМЯ_ПОЛЬЗОВАТЕЛЯ@IP_АДРЕС_СЕРВЕРА
 
 Серверная OS - Debian (10 и выше)/Ubuntu и им подобные:
 ```
-sudo apt install nodejs
-sudo apt install npm
+sudo apt install nodejs -y
+sudo apt install npm -y
 npm install pm2 -g
 ```
 #### 4.3 Загрузка бота на сервер
