@@ -14,12 +14,22 @@ dp = Dispatcher(bot)
 
 # Список всех предметов для парсера
 subjects_names = ['Русский язык', 'Математика',
-                  'ИЗО', 'Обществознание',
-                  'Английский язык',
-                  'Всеобщая история', 'История России',
-                  'Музыка', 'Биология', 'География', "Технология",
-                  "Информатика", "Литература", "История россии",
-                  "Всеобщая История"]
+                  'ИЗО', "Литература",
+                  'Английский язык', 'Всеобщая история',
+                  'История России',
+                  'Музыка', 'Физика', 'Биология',
+                  'География', "Технология",
+                  "Информатика", 'Обществознание']
+
+subjects_cmd = {"russian": "Русский язык", "math": "Математика",
+                "art": "ИЗО", "literature": "Литература",
+                "english": "Английский язык",
+                "history": "Всеобщая история",
+                "russian_history": "История России",
+                "music": "Музыка", "physics": "Физика",
+                "bio": "Биология", "geography": "География",
+                "technology": "Технология", "informatics": "Информатика",
+                "social_studies": "Обществознание"}
 
 aboutMSG = """
 Бот призван помочь вам в поиске нужного домашнего задания. Сделан с акцентом на простоту и удобство)
@@ -35,28 +45,29 @@ NotificationMSG = """
 Russian = InlineKeyboardButton('Русский язык', callback_data='0')
 Math = InlineKeyboardButton('Математика', callback_data='1')
 Painting = InlineKeyboardButton('ИЗО', callback_data='2')
-English = InlineKeyboardButton('Английский язык', callback_data='3')
-History = InlineKeyboardButton('Всеобщая история', callback_data='4')
-RussianHistory = InlineKeyboardButton('История России', callback_data='5')
-Music = InlineKeyboardButton('Музыка', callback_data='6')
-Bio = InlineKeyboardButton('Биология', callback_data='7')
-Geography = InlineKeyboardButton('География', callback_data='8')
-SocialScience = InlineKeyboardButton('Обществознание', callback_data='9')
-Technology = InlineKeyboardButton('Технология', callback_data='10')
-ComputerScience = InlineKeyboardButton('Информатика', callback_data='11')
-Literature = InlineKeyboardButton('Литература', callback_data='12')
+Literature = InlineKeyboardButton('Литература', callback_data='3')
+English = InlineKeyboardButton('Английский язык', callback_data='4')
+History = InlineKeyboardButton('Всеобщая история', callback_data='5')
+RussianHistory = InlineKeyboardButton('История России', callback_data='6')
+Music = InlineKeyboardButton('Музыка', callback_data='7')
+Physics = InlineKeyboardButton('Физика', callback_data='8')
+Bio = InlineKeyboardButton('Биология', callback_data='9')
+Geography = InlineKeyboardButton('География', callback_data='10')
+Technology = InlineKeyboardButton('Технология', callback_data='11')
+ComputerScience = InlineKeyboardButton('Информатика', callback_data='12')
+SocialScience = InlineKeyboardButton('Обществознание', callback_data='13')
 
 # Создаём клавиатуру, добавляя в неё выше объявленные кнопки 
 keyboard = InlineKeyboardMarkup(row_width=2) \
     .row(Russian, Math, Painting) \
     .row(Literature, English).row(History, RussianHistory) \
-    .row(Music, Bio) \
+    .row(Music, Physics, Bio) \
     .row(Geography, Technology) \
     .row(ComputerScience, SocialScience)
 
 # Создаём другие кнопки: закрыть, подписаться, вернуться в меню 
 MessageButtons = InlineKeyboardMarkup(row_width=2).row(
-    InlineKeyboardButton('Вернуться в меню', callback_data='back'),
+    InlineKeyboardButton('Меню', callback_data='back'),
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
 SubscribeButtons = InlineKeyboardMarkup(row_width=2).row(
@@ -100,7 +111,12 @@ async def process_notifications_command(message: types.Message):
 async def answer(message: types.Message):
     command = message.text
     search_request = ""
-    if message.from_user.id == config.owner_id and "/" in command:
+    if command.replace("/", "") in subjects_cmd:
+        await bot.send_message(message.from_user.id,
+                               get_subject(
+                                   subjects_cmd[command.replace("/", "")]),
+                               reply_markup=MessageButtons)
+    elif message.from_user.id == config.owner_id and "/" in command:
         if "/add" in command:
             dbHandle.add_post(connection, message.text.replace("/add ", ""))
             await message.reply("Добавлено!")
@@ -137,35 +153,13 @@ async def answer(message: types.Message):
 async def process_callback_buttons(callback_query: types.CallbackQuery):
     code = callback_query.data
     # Обработка школьных предметов:
-    
-    if code == '0':
-        await bot.send_message(callback_query.from_user.id, get_subject("Русский язык"), reply_markup=MessageButtons)
-    elif code == '1':
-        await bot.send_message(callback_query.from_user.id, get_subject("Математика"), reply_markup=MessageButtons)
-    elif code == '2':
-        await bot.send_message(callback_query.from_user.id, get_subject("ИЗО"), reply_markup=MessageButtons)
-    elif code == '3':
-        await bot.send_message(callback_query.from_user.id, get_subject("Английский язык"), reply_markup=MessageButtons)
-    elif code == '4':
-        await bot.send_message(callback_query.from_user.id,
-                               get_subject("Всеобщая история"),
-                               reply_markup=MessageButtons)
-    elif code == '5':
-        await bot.send_message(callback_query.from_user.id, get_subject("История России"), reply_markup=MessageButtons)
-    elif code == '6':
-        await bot.send_message(callback_query.from_user.id, get_subject("Музыка"), reply_markup=MessageButtons)
-    elif code == '7':
-        await bot.send_message(callback_query.from_user.id, get_subject("Биология"), reply_markup=MessageButtons)
-    elif code == '8':
-        await bot.send_message(callback_query.from_user.id, get_subject("География"), reply_markup=MessageButtons)
-    elif code == '9':
-        await bot.send_message(callback_query.from_user.id, get_subject("Обществознание"), reply_markup=MessageButtons)
-    elif code == '10':
-        await bot.send_message(callback_query.from_user.id, get_subject("Технология"), reply_markup=MessageButtons)
-    elif code == '11':
-        await bot.send_message(callback_query.from_user.id, get_subject("Информатика"), reply_markup=MessageButtons)
-    elif code == '12':
-        await bot.send_message(callback_query.from_user.id, get_subject("Литература"), reply_markup=MessageButtons)
+    if str(code).isdigit():
+        if 0 <= int(code) < len(subjects_names):
+            await bot.send_message(callback_query.from_user.id,
+                                   get_subject(subjects_names[int(code)]),
+                                   reply_markup=MessageButtons)
+        else:
+            logging.error(f"The code {code} the ot of range.")
     # Возврат к меню
     elif code == 'back':
         await bot.send_message(callback_query.from_user.id, "Выбери нужный тебе предмет:", reply_markup=keyboard)
