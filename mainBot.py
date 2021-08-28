@@ -7,7 +7,7 @@ from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Bot, Dispatcher, executor, types
-#Выше импорт необходимых модулей для работы бота
+# Выше импорт необходимых модулей для работы бота
 
 # задаем уровень логов
 logging.basicConfig(level=logging.DEBUG)
@@ -33,7 +33,7 @@ NotificationMSG = """
 Ты в любой момент сможешь изменить свой выбор командой /notifications
 """
 
-#Кнопки с названиями пердметов
+# Кнопки с названиями пердметов
 Russian = InlineKeyboardButton('Русский язык', callback_data='0')
 Math = InlineKeyboardButton('Математика', callback_data='1')
 Painting = InlineKeyboardButton('ИЗО', callback_data='2')
@@ -48,7 +48,7 @@ Technology = InlineKeyboardButton('Технология', callback_data='10')
 ComputerScience = InlineKeyboardButton('Информатика', callback_data='11')
 Literature = InlineKeyboardButton('Литература', callback_data='12')
 
-#Создаём клавиатуру, добавляя в неё выше объявленные кнопки 
+# Создаём клавиатуру, добавляя в неё выше объявленные кнопки 
 keyboard = InlineKeyboardMarkup(row_width=2) \
         .row(Russian, Math, Painting) \
         .row(Literature, English).row(History, RussianHistory) \
@@ -56,7 +56,7 @@ keyboard = InlineKeyboardMarkup(row_width=2) \
         .row(Geography, Technology) \
         .row(ComputerScience, SocialScience) 
 
-#Создаём другие кнопки: закрыть, подписаться, вернуться в меню 
+# Создаём другие кнопки: закрыть, подписаться, вернуться в меню 
 MessageButtons = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Вернуться в меню', callback_data='back'),
     InlineKeyboardButton('Закрыть', callback_data='delete'))
@@ -71,29 +71,29 @@ OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
 CloseButton = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
-#Подключаемся к БД (базе данных)
+# Подключаемся к БД (базе данных)
 connection = dbHandle.Connect("database.db")
 dbHandle.CreatePostsTable(connection)
 dbHandle.CreateSubscribersTable(connection)
 
-#Обработчик команды /start
+# Обработчик команды /start
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
     await message.answer_sticker("CAACAgIAAxkBAAEBO5VgiprjZ-LcWQABw12tF2wzdlqxoyIAAt4AA_R7GQABvYXvbvfFzj0fBA")
     await message.reply("Привет! Пожалуйста выбери нужный тебе предмет.", reply_markup=keyboard)
     await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=OnlySubscribeButton)
 
-#Обработчик команды /about
+# Обработчик команды /about
 @dp.message_handler(commands=['about'])
 async def process_about_command(message: types.Message):
     await message.reply(aboutMSG, reply_markup=CloseButton)
 
-#Обработчик команды /notifications
+# Обработчик команды /notifications
 @dp.message_handler(commands=['notifications'])
 async def process_notifications_command(message: types.Message):
     await message.reply(NotificationMSG, reply_markup=SubscribeButtons)
 
-#Обработчик других текстовых команд
+# Обработчик других текстовых команд
 @dp.message_handler()
 async def answer(message: types.Message):
     command = message.text
@@ -121,7 +121,7 @@ async def answer(message: types.Message):
                 await message.reply("Удалено. Удалённый пост: \n" + post[-1][1])
             except:
                 await message.reply("Возникла ошибка :( \nВозможно, данная публикация не существует ¯\\_(ツ)_/¯")
-    else: #Можно удалить, т. к. использовать текстовые команды, которые нигде не объявлены пользователь вряд-ли будет использовать
+    else:
         for subject in subjects_names:
             if subject in command:
                 search_request = subject
@@ -131,11 +131,11 @@ async def answer(message: types.Message):
 #            await message.reply("Кажется, я не смогу тебе помочь")
 #            await message.answer_sticker("CAACAgIAAxkBAAEBOzxgikgyP2ZGA-hg_QWktTVyfr-0SQAC-QADVp29CpVlbqsqKxs2HwQ")
 
-#Обработка кнопок
+# Обработка кнопок
 @dp.callback_query_handler(lambda c: c.data)
 async def process_callback_buttons(callback_query: types.CallbackQuery):
     code = callback_query.data
-    #Обработка школьных предметов:
+    # Обработка школьных предметов:
     if (code == '0'):
         await bot.send_message(callback_query.from_user.id, get_subject("Русский язык"), reply_markup=MessageButtons)
     elif (code == '1'):
@@ -162,23 +162,23 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
         await bot.send_message(callback_query.from_user.id, get_subject("Информатика"), reply_markup=MessageButtons)
     elif (code == '12'):
         await bot.send_message(callback_query.from_user.id, get_subject("Литература"), reply_markup=MessageButtons)
-    elif (code == 'back'): #Возврат к меню
+    elif (code == 'back'): # Возврат к меню
         await bot.send_message(callback_query.from_user.id, "Выбери нужный тебе предмет:", reply_markup=keyboard)
-    elif (code == 'delete'): #Удаление сообщения
+    elif (code == 'delete'): # Удаление сообщения
         await callback_query.message.delete()
-    elif (code == 'subscribe'): #Подписываем пользователя к рассылке
+    elif (code == 'subscribe'): # Подписываем пользователя к рассылке
         if(not dbHandle.IsSubscriber(connection, callback_query.from_user.id)):
             dbHandle.Subscribe(connection, callback_query.from_user.id)
             await bot.send_message(callback_query.from_user.id, "Хорошо, я тебя запомнил.", reply_markup=CloseButton)
         else:
             await bot.send_message(callback_query.from_user.id, "Ты уже подписан(а) на рассылку уведомлений. Где-то я тебя раньше видел...", reply_markup=CloseButton)
-    elif (code == 'unsubscribe'): #Отписываем пользователя от рассылки
+    elif (code == 'unsubscribe'): # Отписываем пользователя от рассылки
         if(dbHandle.IsSubscriber(connection, callback_query.from_user.id)):
             dbHandle.Unsubscribe(connection, callback_query.from_user.id)
             await bot.send_message(callback_query.from_user.id, "Теперь ты отписан(а) от рассылки.", reply_markup=CloseButton)
         else:
             await bot.send_message(callback_query.from_user.id, "Кажется, ты и так не подписан(а) на рассылку уведомлений.", reply_markup=CloseButton)
-    elif (code == 'FirstSubscribe'): #Обработка предложения подписки на рассылку (при активации)
+    elif (code == 'FirstSubscribe'): # Обработка предложения подписки на рассылку (при активации)
         if(not dbHandle.IsSubscriber(connection, callback_query.from_user.id)):
             dbHandle.Subscribe(connection, callback_query.from_user.id)
             await callback_query.message.edit_text("Вы успешно подписались на рассылку.")
@@ -186,9 +186,9 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
         else:
             await callback_query.message.edit_text("Ты уже был(а) подписан(а) на рассылку.")
             await callback_query.message.edit_reply_markup(CloseButton)
-    await bot.answer_callback_query(callback_query.id) #Говорим телеграмму о том, что обработали нажатие кнопки
+    await bot.answer_callback_query(callback_query.id) # Говорим телеграмму о том, что обработали нажатие кнопки
 
-#Парсер, отделяет нужное задание от всех остальных
+# Парсер, отделяет нужное задание от всех остальных
 def cut_subject(subject, post):
     date = ""
     for line in post.split('\n'):
@@ -202,7 +202,7 @@ def cut_subject(subject, post):
         if (subject in i):
             return date + '\n' + i
 
-#Поиск нужного задания:
+# Поиск нужного задания:
 def get_subject(subject):
     sub = dbHandle.SelectFromKey(connection, subject)
     try:
@@ -210,6 +210,6 @@ def get_subject(subject):
     except:
         return "Ошибка: не удалось выполнить поиск!"
 
-#Запускаем бота
+# Запускаем бота
 if __name__ == '__main__':
 	executor.start_polling(dp, skip_updates=True)
