@@ -80,7 +80,7 @@ ssh ИМЯ_ПОЛЬЗОВАТЕЛЯ@IP_АДРЕС_СЕРВЕРА
 ```
 sudo apt install nodejs -y
 sudo apt install npm -y
-npm install pm2 -g
+sudo npm install pm2 -g
 ```
 #### 4.3 Загрузка бота на сервер
 Загрузите исходные коды бота на сервер, например с помощью [FileZilla](https://filezilla-project.org/) или панели вашего хостинга. 
