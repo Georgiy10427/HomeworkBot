@@ -1,0 +1,19 @@
+russian - Русский язык
+algebra - Алгебра
+art - ИЗО
+literature - Литература
+english - Английский язык
+history - Всеобщая история
+russian_history - История России
+music - Музыка
+physics - Физика
+bio - Биология
+geography - География
+technology - Технология
+informatics - Информатика
+social_studies - Обществознание
+geometry - Геометрия
+timetable - Расписание
+start - Активировать бота
+about - О боте
+notifications - Управление уведомлениями

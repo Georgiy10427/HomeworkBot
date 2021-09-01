@@ -13,15 +13,15 @@ bot = Bot(token=config.API_TOKEN)
 dp = Dispatcher(bot)
 
 # Список всех предметов для парсера
-subjects_names = ['Русский язык', 'Математика',
+subjects_names = ['Русский язык', 'Алгебра',
                   'ИЗО', "Литература",
                   'Английский язык', 'Всеобщая история',
                   'История России',
                   'Музыка', 'Физика', 'Биология',
                   'География', "Технология",
-                  "Информатика", 'Обществознание']
+                  "Информатика", 'Обществознание', 'Геометрия']
 
-subjects_cmd = {"russian": "Русский язык", "math": "Математика",
+subjects_cmd = {"russian": "Русский язык", "algebra": "Алгебра",
                 "art": "ИЗО", "literature": "Литература",
                 "english": "Английский язык",
                 "history": "Всеобщая история",
@@ -29,7 +29,9 @@ subjects_cmd = {"russian": "Русский язык", "math": "Математи�
                 "music": "Музыка", "physics": "Физика",
                 "bio": "Биология", "geography": "География",
                 "technology": "Технология", "informatics": "Информатика",
-                "social_studies": "Обществознание"}
+                "social_studies": "Обществознание", "geometry": "Геометрия"}
+
+timetable_cmd = "timetable"
 
 aboutMSG = """
 Бот призван помочь вам в поиске нужного домашнего задания. Сделан с акцентом на простоту и удобство)
@@ -43,7 +45,7 @@ NotificationMSG = """
 
 # Кнопки с названиями предметов
 Russian = InlineKeyboardButton('Русский язык', callback_data='0')
-Math = InlineKeyboardButton('Математика', callback_data='1')
+Algebra = InlineKeyboardButton('Алгебра', callback_data='1')
 Painting = InlineKeyboardButton('ИЗО', callback_data='2')
 Literature = InlineKeyboardButton('Литература', callback_data='3')
 English = InlineKeyboardButton('Английский язык', callback_data='4')
@@ -56,14 +58,17 @@ Geography = InlineKeyboardButton('География', callback_data='10')
 Technology = InlineKeyboardButton('Технология', callback_data='11')
 ComputerScience = InlineKeyboardButton('Информатика', callback_data='12')
 SocialScience = InlineKeyboardButton('Обществознание', callback_data='13')
+Geometry = InlineKeyboardButton('Геометрия', callback_data='14')
+Timetable = InlineKeyboardButton('Расписание', url=config.timetable_link)
 
 # Создаём клавиатуру, добавляя в неё выше объявленные кнопки 
 keyboard = InlineKeyboardMarkup(row_width=2) \
-    .row(Russian, Math, Painting) \
+    .row(Russian, Algebra, Painting) \
     .row(Literature, English).row(History, RussianHistory) \
     .row(Music, Physics, Bio) \
     .row(Geography, Technology) \
-    .row(ComputerScience, SocialScience)
+    .row(ComputerScience, SocialScience) \
+    .row(Geometry, Timetable)
 
 # Создаём другие кнопки: закрыть, подписаться, вернуться в меню 
 MessageButtons = InlineKeyboardMarkup(row_width=2).row(
@@ -80,7 +85,7 @@ OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
 CloseButton = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
-# Подключаемся к БД (базе данных)
+# Подключаемся к БД
 connection = dbHandle.connect("database.db")
 dbHandle.create_posts(connection)
 dbHandle.create_subscribers(connection)
@@ -116,6 +121,11 @@ async def answer(message: types.Message):
                                get_subject(
                                    subjects_cmd[command.replace("/", "")]),
                                reply_markup=MessageButtons)
+    elif timetable_cmd in command.replace("/", ""):
+        await bot.send_message(message.from_user.id,
+                               "Ссылка на расписание",
+                               reply_markup=InlineKeyboardMarkup()
+                               .row(Timetable))
     elif message.from_user.id == config.owner_id and "/" in command:
         if "/add" in command:
             dbHandle.add_post(connection, message.text.replace("/add ", ""))
