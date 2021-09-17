@@ -1,7 +1,6 @@
 import config
 import logging
 import dbHandle
-import complete
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Bot, Dispatcher, executor, types
 # Выше импорт необходимых модулей для работы бота
@@ -76,11 +75,6 @@ MessageButtons = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Меню', callback_data='back'),
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
-MessageButtonsWithAnswer = InlineKeyboardMarkup(row_width=2).row(
-    InlineKeyboardButton('Меню', callback_data='back'),
-    InlineKeyboardButton("Ответ", callback_data='answer'),
-    InlineKeyboardButton('Закрыть', callback_data='delete'))
-
 SubscribeButtons = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Отписаться', callback_data='unsubscribe'),
     InlineKeyboardButton('Подписаться', callback_data='subscribe'))
@@ -91,14 +85,7 @@ OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
 CloseButton = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
-AnswerButtons = InlineKeyboardMarkup().row(
-    InlineKeyboardButton('Меню', callback_data='back'),
-    InlineKeyboardButton("Полностью", callback_data='full-answer'),
-    InlineKeyboardButton('Закрыть', callback_data='delete')
-)
-
-
-# Подключаемся к БД (базе данных)
+# Подключаемся к БД
 connection = dbHandle.connect("database.db")
 dbHandle.create_posts(connection)
 dbHandle.create_subscribers(connection)
@@ -134,6 +121,11 @@ async def answer(message: types.Message):
                                get_subject(
                                    subjects_cmd[command.replace("/", "")]),
                                reply_markup=MessageButtons)
+    elif timetable_cmd in command.replace("/", ""):
+        await bot.send_message(message.from_user.id,
+                               "Ссылка на расписание",
+                               reply_markup=InlineKeyboardMarkup()
+                               .row(Timetable))
     elif message.from_user.id == config.owner_id and "/" in command:
         if "/add" in command:
             dbHandle.add_post(connection, message.text.replace("/add ", ""))
@@ -157,6 +149,12 @@ async def answer(message: types.Message):
             except Exception as e:
                 logging.error(e)
                 await message.reply("Возникла ошибка :( \nВозможно, данная публикация не существует ¯\\_(ツ)_/¯")
+        elif "/send_new_menu" in command:
+            notification = command.replace("/send_new_menu", "")
+            subscribers = dbHandle.get_subscribers(connection)
+            for user in subscribers:
+                await bot.send_message(user[1], notification, reply_markup=InlineKeyboardMarkup().row(
+                    InlineKeyboardButton("Обновиться", callback_data="menu_update")))
     else:
         for subject in subjects_names:
             if subject in command:
@@ -173,16 +171,11 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
     # Обработка школьных предметов:
     if str(code).isdigit():
         if 0 <= int(code) < len(subjects_names):
-            content = get_subject(subjects_names[int(code)])
-            if "|||" in content:
-                await bot.send_message(callback_query.from_user.id,
-                                       content.split("|||")[0],
-                                       reply_markup=MessageButtonsWithAnswer)
-            else:
-                await bot.send_message(callback_query.from_user.id,
-                                       content.split("|||")[0], reply_markup=MessageButtons)
+            await bot.send_message(callback_query.from_user.id,
+                                   get_subject(subjects_names[int(code)]),
+                                   reply_markup=MessageButtons)
         else:
-            logging.error(f"The code {code} the out of range.")
+            logging.error(f"The code {code} the ot of range.")
     # Возврат к меню
     elif code == 'back':
         await bot.send_message(callback_query.from_user.id, "Выбери нужный тебе предмет:", reply_markup=keyboard)
@@ -218,32 +211,9 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
         else:
             await callback_query.message.edit_text("Ты уже был(а) подписан(а) на рассылку.")
             await callback_query.message.edit_reply_markup(CloseButton)
-    elif code == "answer":
-        for s in subjects_names:
-            if s in callback_query.message.text:
-                numbers = get_subject(s).split("|||")[1]\
-                    .replace(" ", "").replace("\n", "").split(",")
-                print(f"NUMBERS: {numbers}")
-                messages = complete.get_answer(s, numbers, 7)
-                for m in messages:
-                    await bot.send_photo(callback_query.from_user.id, m.images[-1],
-                                         m.text, reply_markup=AnswerButtons)
-                break
-    elif code == "full-answer":
-        for s in subjects_names:
-            print(f"\n\n{str(callback_query.message.caption)}\n\n")
-            if s.lower() in callback_query.message.caption.lower():
-                numbers = get_subject(s).split("|||")[1]\
-                    .replace(" ", "").replace("\n", "").split(",")
-                print(f"NUMBERS: {numbers}")
-                messages = complete.get_answer(s, numbers, 7)
-                for m in messages:
-                    media = types.MediaGroup()
-                    for img in m.images:
-                        media.attach_photo(img)
-                    media.media[0].caption = "Все найденные ответы на задание."
-                    await bot.send_media_group(callback_query.from_user.id, media=media)
-                break
+    elif code == "menu_update":
+        await callback_query.message.edit_text("Выбери нужный тебе предмет:")
+        await callback_query.message.edit_reply_markup(keyboard)
     # Говорим телеграмму о том, что обработали нажатие кнопки:
     await bot.answer_callback_query(callback_query.id)
 
