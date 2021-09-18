@@ -130,10 +130,14 @@ async def answer(message: types.Message):
     command = message.text
     search_request = ""
     if command.replace("/", "") in subjects_cmd:
-        await bot.send_message(message.from_user.id,
-                               get_subject(
-                                   subjects_cmd[command.replace("/", "")]),
-                               reply_markup=MessageButtons)
+        content = get_subject(subjects_cmd[command.replace("/", "")])
+        if "|||" in content:
+            await bot.send_message(message.from_user.id,
+                                   content.split("|||")[0],
+                                   reply_markup=MessageButtonsWithAnswer)
+        else:
+            await bot.send_message(message.from_user.id,
+                                   content.split("|||")[0], reply_markup=MessageButtons)
     elif message.from_user.id == config.owner_id and "/" in command:
         if "/add" in command:
             dbHandle.add_post(connection, message.text.replace("/add ", ""))
