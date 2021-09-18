@@ -2,7 +2,7 @@ import config
 import logging
 import dbHandle
 import complete
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, MediaGroup
 from aiogram import Bot, Dispatcher, executor, types
 # Выше импорт необходимых модулей для работы бота
 
@@ -166,6 +166,16 @@ async def answer(message: types.Message):
             await message.reply(get_subject(search_request))
 
 
+# Поиск нужного задания:
+def get_subject(subject):
+    sub = dbHandle.select_from_key(connection, subject)
+    try:
+        return cut_subject(subject, sub[-1][1])
+    except Exception as e:
+        logging.error(e)
+        return "Ошибка: не удалось выполнить поиск!"
+
+
 # Обработка кнопок
 @dp.callback_query_handler(lambda c: c.data)
 async def process_callback_buttons(callback_query: types.CallbackQuery):
@@ -226,8 +236,16 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
                 print(f"NUMBERS: {numbers}")
                 messages = complete.get_answer(s, numbers, 7)
                 for m in messages:
-                    await bot.send_photo(callback_query.from_user.id, m.images[-1],
-                                         m.text, reply_markup=AnswerButtons)
+                    if s.lower() == "география" or \
+                            s.lower() == "английский язык":
+                        media = MediaGroup()
+                        for img in m.images:
+                            media.attach_photo(img)
+                        media.media[0].caption = m.text
+                        await bot.send_media_group(callback_query.from_user.id, media=media)
+                    else:
+                        await bot.send_photo(callback_query.from_user.id, m.images[-1],
+                                             m.text, reply_markup=AnswerButtons)
                 break
     elif code == "full-answer":
         for s in subjects_names:
@@ -261,16 +279,6 @@ def cut_subject(subject, post):
     for i in subjects:
         if subject in i:
             return date + '\n' + i
-
-
-# Поиск нужного задания:
-def get_subject(subject):
-    sub = dbHandle.select_from_key(connection, subject)
-    try:
-        return cut_subject(subject, sub[-1][1])
-    except Exception as e:
-        logging.error(e)
-        return "Ошибка: не удалось выполнить поиск!"
 
 
 # Запускаем бота

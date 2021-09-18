@@ -83,8 +83,11 @@ def get_answer(subject_name: str, numbers: list, school_class: int):
                 logging.error(f"Неверный номер задания: {number}")
             print(link)
             message.images = get_content(link)
-            message.text = \
-                f"{random.choice(phrases) % f'{subject_name.lower()}, упражнение {number}'}".replace("\n", "")
+            if subject_name.lower() == "география" or subject_name.lower() == "английский язык":
+                message.text = f"{subject_name.lower().title()}, страница {number}"
+            else:
+                message.text = \
+                    f"{random.choice(phrases) % f'{subject_name.lower()}, упражнение {number}'}".replace("\n", "")
             messages.append(message)
         else:
             logging.error(f"Некорректный номер задания: {number}")
