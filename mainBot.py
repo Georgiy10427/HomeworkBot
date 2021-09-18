@@ -138,6 +138,11 @@ async def answer(message: types.Message):
         else:
             await bot.send_message(message.from_user.id,
                                    content.split("|||")[0], reply_markup=MessageButtons)
+    elif timetable_cmd in command.replace("/", ""):
+        await bot.send_message(message.from_user.id,
+                               "Ссылка на расписание",
+                               reply_markup=InlineKeyboardMarkup()
+                               .row(Timetable))
     elif message.from_user.id == config.owner_id and "/" in command:
         if "/add" in command:
             dbHandle.add_post(connection, message.text.replace("/add ", ""))
