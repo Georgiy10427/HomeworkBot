@@ -253,8 +253,12 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
                         media.media[0].caption = m.text
                         await bot.send_media_group(callback_query.from_user.id, media=media)
                     else:
-                        await bot.send_photo(callback_query.from_user.id, m.images[-1],
-                                             m.text, reply_markup=AnswerButtons)
+                        if len(m.images) > 1:
+                            await bot.send_photo(callback_query.from_user.id, m.images[1],
+                                                 m.text, reply_markup=AnswerButtons)
+                        else:
+                            await bot.send_photo(callback_query.from_user.id, m.images[-1],
+                                                 m.text, reply_markup=AnswerButtons)
                 break
     elif code == "full-answer":
         for s in subjects_names:
