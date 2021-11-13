@@ -94,6 +94,7 @@ OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
 CloseButton = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
+
 AnswerButtons = InlineKeyboardMarkup().row(
     InlineKeyboardButton('Меню', callback_data='back'),
     InlineKeyboardButton('Закрыть', callback_data='delete')
@@ -107,6 +108,8 @@ ErrorButtons = InlineKeyboardMarkup().row(
 
 # Подключаемся к БД (базе данных)
 connection = sqlite3.connect("database.sqlite")
+
+
 dbHandle.create_posts(connection)
 dbHandle.create_subscribers(connection)
 
@@ -145,6 +148,11 @@ async def text_answer(message: types.Message):
         else:
             await bot.send_message(message.from_user.id,
                                    content.split("|||")[0], reply_markup=MessageButtons)
+    elif timetable_cmd in command.replace("/", ""):
+        await bot.send_message(message.from_user.id,
+                               get_subject(
+                                   subjects_cmd[command.replace("/", "")]),
+                               reply_markup=MessageButtons)
     elif timetable_cmd in command.replace("/", ""):
         await bot.send_message(message.from_user.id,
                                "Ссылка на расписание",
