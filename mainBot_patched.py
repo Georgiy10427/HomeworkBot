@@ -1,16 +1,12 @@
-import aiogram.utils.exceptions
 import config
 import logging
 import dbHandle
-import sqlite3
-import complete
-import time
-import cv2
-from aiogram.types import *
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Bot, Dispatcher, executor, types
+# Выше импорт необходимых модулей для работы бота
 
-
-logging.basicConfig(level=logging.INFO)
+# задаем уровень логов
+logging.basicConfig(level=logging.DEBUG)
 
 # инициализируем бота
 bot = Bot(token=config.API_TOKEN)
@@ -79,11 +75,6 @@ MessageButtons = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Меню', callback_data='back'),
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
-MessageButtonsWithAnswer = InlineKeyboardMarkup(row_width=2).row(
-    InlineKeyboardButton('Меню', callback_data='back'),
-    InlineKeyboardButton("Ответ", callback_data='answer'),
-    InlineKeyboardButton('Закрыть', callback_data='delete'))
-
 SubscribeButtons = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Отписаться', callback_data='unsubscribe'),
     InlineKeyboardButton('Подписаться', callback_data='subscribe'))
@@ -94,22 +85,8 @@ OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
 CloseButton = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
-
-AnswerButtons = InlineKeyboardMarkup().row(
-    InlineKeyboardButton('Меню', callback_data='back'),
-    InlineKeyboardButton('Закрыть', callback_data='delete')
-)
-
-ErrorButtons = InlineKeyboardMarkup().row(
-    InlineKeyboardButton("Отправить отчёт", callback_data="forward_to_admin"),
-    InlineKeyboardButton("Закрыть", callback_data="delete")
-)
-
-
-# Подключаемся к БД (базе данных)
-connection = sqlite3.connect("database.sqlite")
-
-
+# Подключаемся к БД
+connection = dbHandle.connect("database.db")
 dbHandle.create_posts(connection)
 dbHandle.create_subscribers(connection)
 
@@ -136,19 +113,10 @@ async def process_notifications_command(message: types.Message):
 
 # Обработчик других текстовых команд
 @dp.message_handler()
-async def text_answer(message: types.Message):
+async def answer(message: types.Message):
     command = message.text
     search_request = ""
     if command.replace("/", "") in subjects_cmd:
-        content = get_subject(subjects_cmd[command.replace("/", "")])
-        if "|||" in content:
-            await bot.send_message(message.from_user.id,
-                                   content.split("|||")[0],
-                                   reply_markup=MessageButtonsWithAnswer)
-        else:
-            await bot.send_message(message.from_user.id,
-                                   content.split("|||")[0], reply_markup=MessageButtons)
-    elif timetable_cmd in command.replace("/", ""):
         await bot.send_message(message.from_user.id,
                                get_subject(
                                    subjects_cmd[command.replace("/", "")]),
@@ -181,6 +149,12 @@ async def text_answer(message: types.Message):
             except Exception as e:
                 logging.error(e)
                 await message.reply("Возникла ошибка :( \nВозможно, данная публикация не существует ¯\\_(ツ)_/¯")
+        elif "/send_new_menu" in command:
+            notification = command.replace("/send_new_menu", "")
+            subscribers = dbHandle.get_subscribers(connection)
+            for user in subscribers:
+                await bot.send_message(user[1], notification, reply_markup=InlineKeyboardMarkup().row(
+                    InlineKeyboardButton("Обновиться", callback_data="menu_update")))
     else:
         for subject in subjects_names:
             if subject in command:
@@ -190,16 +164,6 @@ async def text_answer(message: types.Message):
             await message.reply(get_subject(search_request))
 
 
-# Поиск нужного задания:
-def get_subject(subject):
-    sub = dbHandle.select_from_key(connection, subject)
-    try:
-        return cut_subject(subject, sub[-1][1])
-    except Exception as e:
-        logging.error(e)
-        return "Ошибка: не удалось выполнить поиск!"
-
-
 # Обработка кнопок
 @dp.callback_query_handler(lambda c: c.data)
 async def process_callback_buttons(callback_query: types.CallbackQuery):
@@ -207,29 +171,17 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
     # Обработка школьных предметов:
     if str(code).isdigit():
         if 0 <= int(code) < len(subjects_names):
-            content = get_subject(subjects_names[int(code)])
-            if "|||" in content:
-                await bot.send_message(callback_query.from_user.id,
-                                       content.split("|||")[0],
-                                       reply_markup=MessageButtonsWithAnswer)
-            else:
-                await bot.send_message(callback_query.from_user.id,
-                                       content.split("|||")[0], reply_markup=MessageButtons)
+            await bot.send_message(callback_query.from_user.id,
+                                   get_subject(subjects_names[int(code)]),
+                                   reply_markup=MessageButtons)
         else:
-            logging.error(f"The code {code} the out of range.")
+            logging.error(f"The code {code} the ot of range.")
     # Возврат к меню
     elif code == 'back':
         await bot.send_message(callback_query.from_user.id, "Выбери нужный тебе предмет:", reply_markup=keyboard)
     # Удаление сообщения
     elif code == 'delete':
-        try:
-            await callback_query.message.delete()
-        except aiogram.utils.exceptions.MessageCantBeDeleted:
-            await callback_query.answer("Невозможно удалить старое сообщение")
-        except Exception as e:
-            logging.error(e)
-            await callback_query.answer("Произошла неизвестная ошибка")
-
+        await callback_query.message.delete()
     # Подписываем пользователя к рассылке
     elif code == 'subscribe':
         if not dbHandle.is_subscriber(connection, callback_query.from_user.id):
@@ -259,90 +211,11 @@ async def process_callback_buttons(callback_query: types.CallbackQuery):
         else:
             await callback_query.message.edit_text("Ты уже был(а) подписан(а) на рассылку.")
             await callback_query.message.edit_reply_markup(CloseButton)
-    # Поиск GDZ
-    elif code == "answer":
-        try:
-            if "русский язык:" in callback_query.message.text.lower():
-                await get_answer(callback_query, var=2)
-            else:
-                await get_answer(callback_query)
-        except Exception as e:
-            await bot.send_sticker(callback_query.from_user.id,
-                                   "CAACAgUAAxkBAAEDOpZhhmHGlrx_q_QZoniqGX7HSXDypwACHAAD1UnhJlt52LObeelbIgQ")
-            await bot.send_message(callback_query.from_user.id, f"Непредвиденная ошибка: {e}",
-                                   reply_markup=ErrorButtons)
-    # Пересылка отчёта админу
-    elif code == "forward_to_admin":
-        try:
-            await callback_query.message.forward(config.owner_id)
-            await callback_query.answer("Отчёт успешно отправлен.")
-        except Exception as e:
-            await bot.send_sticker(callback_query.from_user.id,
-                                   "CAACAgUAAxkBAAEDOphhhmHRpuN8ho11CFk9bvnliCk7WAACIAAD1UnhJqrJn62Al-93IgQ")
-            await bot.send_message(callback_query.from_user.id, f"Не удалось отправить отчёт, ошибка: {e}",
-                                   reply_markup=CloseButton)
+    elif code == "menu_update":
+        await callback_query.message.edit_text("Выбери нужный тебе предмет:")
+        await callback_query.message.edit_reply_markup(keyboard)
+    # Говорим телеграмму о том, что обработали нажатие кнопки:
     await bot.answer_callback_query(callback_query.id)
-
-
-async def get_answer(query: types.CallbackQuery, var=1):
-    text_message: str = query.message.text
-    current_subject: str = ""
-
-    for subject in subjects_names:
-        if subject in text_message:
-            current_subject = subject
-            break
-    else:
-        await query.answer("Ошибка: не удалось определить предмет.")
-        return
-
-    try:
-        numbers: list = get_subject(current_subject) \
-                            .split("|||")[1].replace(" ", "").replace("\n", "").split(",")
-    except IndexError:
-        await query.answer("Ошибка: не удалось определить номер задания.")
-        return
-    try:
-        answers = complete.get_answers(current_subject, numbers, 7, var=var)
-        if type(answers) != list:
-            raise answers
-    except Exception as e:
-        await bot.send_sticker(query.from_user.id,
-                               "CAACAgUAAxkBAAEDOpZhhmHGlrx_q_QZoniqGX7HSXDypwACHAAD1UnhJlt52LObeelbIgQ")
-        await bot.send_message(query.from_user.id,
-                               f"Ошибка сетевого соединения (сервер): {e}",
-                               reply_markup=ErrorButtons)
-        return
-    for answer in answers:
-        if answer.img_height > 840:
-            filename = str(time.strftime('tmp/%Y%m%d-%H.%M.%S.jpg'))
-            cv2.imwrite(filename, answer.image)
-            file = InputFile(filename)
-            await bot.send_document(query.from_user.id, document=file, caption=answer.text,
-                                    reply_markup=AnswerButtons)
-        else:
-            await bot.send_photo(query.from_user.id, complete.cv_to_bytes(answer.image),
-                                 answer.text, reply_markup=AnswerButtons)
-
-
-async def next_answer(query: types.CallbackQuery):
-    subject = query.message.caption.split("\n")[0].split(",")[0]
-    text_message = query.message.caption.replace(" ", "").lower()
-    text_message = text_message.replace("вариантов", "").replace("вариант", "")
-    text_message = text_message.replace("упражнение", "").replace("страница", "")
-    number = text_message.split("\n")[0].split(",")[1].replace("\n", "")
-    variant = text_message.split("\n")[1].split("из")[0]
-    max_variant_value = text_message.split("\n")[1].split("из")[1]
-    print(number)
-    if variant == int(max_variant_value):
-        variant = 1
-    else:
-        variant = int(variant) + 1
-    answers = complete.get_answers(subject, [int(number)], 7, var=variant)
-    task_answer = answers[0]
-    cv2.imwrite("img.jpg", task_answer.image)
-    await query.message.edit_caption(task_answer.text, reply_markup=AnswerButtons)
-    await query.message.edit_media(complete.cv_to_bytes(task_answer.image))
 
 
 # Парсер, отделяет нужное задание от всех остальных
@@ -358,6 +231,16 @@ def cut_subject(subject, post):
     for i in subjects:
         if subject in i:
             return date + '\n' + i
+
+
+# Поиск нужного задания:
+def get_subject(subject):
+    sub = dbHandle.select_from_key(connection, subject)
+    try:
+        return cut_subject(subject, sub[-1][1])
+    except Exception as e:
+        logging.error(e)
+        return "Ошибка: не удалось выполнить поиск!"
 
 
 # Запускаем бота

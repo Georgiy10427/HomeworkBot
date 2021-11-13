@@ -2,3 +2,4 @@
 API_TOKEN = ''
 # ID владельца бота для возможности администрирования
 owner_id = id
+timetable_link = ""

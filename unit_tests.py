@@ -5,8 +5,9 @@ import config
 from aiogram import Bot
 import mainBot
 import dbHandle
+import sqlite3
 
-connection = dbHandle.Connect("database.db")
+connection = sqlite3.connect("database.sqlite")
 
 key = "#всёдз за 30 апреля"
 all_homework = """#всёдз за 30 апреля
@@ -14,25 +15,23 @@ all_homework = """#всёдз за 30 апреля
 Литература: читать все подвиги Геракла
 Биология: ничего, предыдущее дз - параграф 51 - учить первые 2-3 царства.)"""
 
+
 class TestDatabase(IsolatedAsyncioTestCase):
     async def test_db(self):
-        #Тестирование подписок
-        dbHandle.Subscribe(connection, 1111) #Подписываем тестового пользователя
-        self.assertEqual(dbHandle.IsSubscriber(connection, 1111), True) #Проверяем подписан ли он?
-        dbHandle.Unsubscribe(connection, 1111) #Отписываем тестового пользователя  
-        self.assertEqual(dbHandle.IsSubscriber(connection, 1111), False) #Проверяем, отписался ли он?
-        #Тестирование поиска и хранения постов
+        dbHandle.subscribe(connection, 1111)
+        self.assertEqual(dbHandle.is_subscriber(connection, 1111), True)
+        dbHandle.unsubscribe(connection, 1111)
+        self.assertEqual(dbHandle.is_subscriber(connection, 1111), False)
         print("Test database...")
-        dbHandle.AddPost(connection, "34785873895!_+_^&*#&$(*#&(&$@#(*&&$(*_QWERTYYUIOP{}ASDFGHJKL:|ZXCVBNM<>?") #Добавляем тестовый пост
-        self.assertEqual(dbHandle.SelectFromKey(connection, "*#&$")[-1][1], "34785873895!_+_^&*#&$(*#&(&$@#(*&&$(*_QWERTYYUIOP{}ASDFGHJKL:|ZXCVBNM<>?") #Ищем тестовый пост и сверяем с образцом
-        dbHandle.DeleteFromKey(connection, "*#&$") #Удаляем тестовый пост
-        self.assertEqual(dbHandle.SelectFromKey(connection, "*#&$"), []) #Проверяем удалился ли он
+        dbHandle.add_post(connection, "34785873895!_+_^&*#&$(*#&(&$@#(*&&$(*_QWERTYYUIOP{}ASDFGHJKL:|ZXCVBNM<>?")
+        self.assertEqual(dbHandle.select_from_key(connection, "*#&$")[-1][1], "34785873895!_+_^&*#&$(*#&(&$@#(*&&$(*_QWERTYYUIOP{}ASDFGHJKL:|ZXCVBNM<>?")
+        dbHandle.delete_from_key(connection, "*#&$")
+        self.assertEqual(dbHandle.select_from_key(connection, "*#&$"), [])
         print("Success test database.")
+
 
 class TestBot(IsolatedAsyncioTestCase):
     async def test_bot_auth(self):
-        print("Test connect to the bot.")
-        #Проверяем соединение с ботом
         bot = Bot(token=config.API_TOKEN)
         bot._session = aiohttp.ClientSession()
         bot_info = await bot.get_me()
@@ -43,13 +42,11 @@ class TestBot(IsolatedAsyncioTestCase):
             self.assertEqual(bot_info["username"], "AllHomeworkYbot")
         print("Success test connect to the bot. Bot name: " + bot_info["username"])
 
-class TestService(IsolatedAsyncioTestCase):
     async def test_get_subjects(self):
-        #Проверяем поиск заданий
         subject = mainBot.get_subject("Русский язык:")
         self.assertEqual(type(subject), str)
+
     async def test_cut_subjects(self):
-        #Проверяем корректность отделения задания от остальных 
         print("Test cut_subject function...")
         cut = mainBot.cut_subject("Математика:", all_homework)
         for s in mainBot.subjects_names:
@@ -58,6 +55,12 @@ class TestService(IsolatedAsyncioTestCase):
             else:
                 self.assertEqual(s in cut, True)
         print("Test cut_subject function is success.")
+
+
+#class GdzTest(IsolatedAsyncioTestCase):
+#    async def test_complete(self):
+#
+
 
 if __name__ == '__main__':
     unittest.main()
