@@ -3,7 +3,7 @@ import logging
 from bs4 import BeautifulSoup
 import numpy
 import cv2
-from functools import lru_cache
+
 
 root_url = "https://gdz.ru"
 subjects_urls = {
@@ -42,7 +42,6 @@ class Task(object):
     max_variant_value = 0
 
 
-@lru_cache(maxsize=100)
 def get_image(url: str):
     try:
         response = requests.get(url, stream=True).raw
@@ -108,7 +107,7 @@ def get_tasks_urls(subject_name: str, numbers: list, school_class: int):
                 tasks.append(task)
             elif "геометрия" in subject_name.lower():
                 for chapter in geometry:
-                    if geometry[chapter][0] < int(number) < geometry[chapter][1]:
+                    if geometry[chapter][0] <= int(number) <= geometry[chapter][1]:
                         link = f"{prepare_url}/geometria/atanasyan-7-9/{chapter}-chapter-{number}/".replace("\n", "")
                         task.url = link
                         tasks.append(task)

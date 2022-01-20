@@ -6,6 +6,7 @@ import sqlite3
 import complete
 import time
 import cv2
+import asyncio
 from aiogram.types import *
 from aiogram import Bot, Dispatcher, executor, types
 
@@ -94,7 +95,6 @@ OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
 CloseButton = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
-
 AnswerButtons = InlineKeyboardMarkup().row(
     InlineKeyboardButton('Меню', callback_data='back'),
     InlineKeyboardButton('Закрыть', callback_data='delete')
@@ -108,8 +108,6 @@ ErrorButtons = InlineKeyboardMarkup().row(
 
 # Подключаемся к БД (базе данных)
 connection = sqlite3.connect("database.sqlite")
-
-
 dbHandle.create_posts(connection)
 dbHandle.create_subscribers(connection)
 
@@ -150,11 +148,6 @@ async def text_answer(message: types.Message):
                                    content.split("|||")[0], reply_markup=MessageButtons)
     elif timetable_cmd in command.replace("/", ""):
         await bot.send_message(message.from_user.id,
-                               get_subject(
-                                   subjects_cmd[command.replace("/", "")]),
-                               reply_markup=MessageButtons)
-    elif timetable_cmd in command.replace("/", ""):
-        await bot.send_message(message.from_user.id,
                                "Ссылка на расписание",
                                reply_markup=InlineKeyboardMarkup()
                                .row(Timetable))
@@ -172,6 +165,7 @@ async def text_answer(message: types.Message):
             subscribers = dbHandle.get_subscribers(connection)
             notification = command.replace("/notify ", "")
             for user in subscribers:
+                await asyncio.sleep(0.2)
                 await bot.send_message(user[1], notification, reply_markup=CloseButton)
         elif "/delete" in command:
             post = dbHandle.select_from_key(connection, message.text.replace("/delete ", ""))
