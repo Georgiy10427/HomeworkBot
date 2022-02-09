@@ -10,6 +10,7 @@ import asyncio
 from aiogram.types import *
 from aiogram import Bot, Dispatcher, executor, types
 
+version = 1.32
 
 logging.basicConfig(level=logging.INFO)
 
@@ -47,6 +48,8 @@ NotificationMSG = """
 Если ты подпишешься на рассылку, то будешь получать уведомления о обновлениях заданий.
 Ты в любой момент сможешь изменить свой выбор командой /notifications
 """
+
+requests_stat = int()
 
 # Кнопки с названиями предметов
 Russian = InlineKeyboardButton('Русский язык', callback_data='0')
@@ -118,23 +121,43 @@ async def process_start_command(message: types.Message):
     await message.answer_sticker("CAACAgIAAxkBAAEBO5VgiprjZ-LcWQABw12tF2wzdlqxoyIAAt4AA_R7GQABvYXvbvfFzj0fBA")
     await message.reply("Привет! Пожалуйста выбери нужный тебе предмет.", reply_markup=keyboard)
     await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=OnlySubscribeButton)
+    await message.delete()
+    global requests_stat
+    requests_stat += 1
 
 
 # Обработчик команды /about
 @dp.message_handler(commands=['about'])
 async def process_about_command(message: types.Message):
-    await message.reply(aboutMSG, reply_markup=CloseButton)
+    await bot.send_message(message.from_user.id, aboutMSG, reply_markup=CloseButton)
+    await message.delete()
+    global requests_stat
+    requests_stat += 1
 
 
 # Обработчик команды /notifications
 @dp.message_handler(commands=['notifications'])
 async def process_notifications_command(message: types.Message):
-    await message.reply(NotificationMSG, reply_markup=SubscribeButtons)
+    await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=SubscribeButtons)
+    await message.delete()
+    global requests_stat
+    requests_stat += 1
+
+
+@dp.message_handler(commands=['stat'])
+async def process_stat_command(message: types.Message):
+    global requests_stat
+    await bot.send_message(message.from_user.id,
+                           f"Статистика\nЗа всё время в онлайне: {requests_stat}",
+                           reply_markup=CloseButton)
+    await message.delete()
 
 
 # Обработчик других текстовых команд
 @dp.message_handler()
 async def text_answer(message: types.Message):
+    global requests_stat
+    requests_stat += 1
     command = message.text
     search_request = ""
     if command.replace("/", "") in subjects_cmd:
@@ -166,7 +189,11 @@ async def text_answer(message: types.Message):
             notification = command.replace("/notify ", "")
             for user in subscribers:
                 await asyncio.sleep(0.2)
-                await bot.send_message(user[1], notification, reply_markup=CloseButton)
+                try:
+                    await bot.send_message(user[1], notification, reply_markup=CloseButton)
+                except Exception as e:
+                    logging.error(f"{e}: {user[1]}")
+                    continue
         elif "/delete" in command:
             post = dbHandle.select_from_key(connection, message.text.replace("/delete ", ""))
             dbHandle.delete_from_key(connection, message.text.replace("/delete ", ""))
@@ -182,6 +209,7 @@ async def text_answer(message: types.Message):
                 break
         if search_request != "":
             await message.reply(get_subject(search_request))
+    await message.delete()
 
 
 # Поиск нужного задания:
@@ -197,6 +225,8 @@ def get_subject(subject):
 # Обработка кнопок
 @dp.callback_query_handler(lambda c: c.data)
 async def process_callback_buttons(callback_query: types.CallbackQuery):
+    global requests_stat
+    requests_stat += 1
     code = callback_query.data
     # Обработка школьных предметов:
     if str(code).isdigit():
@@ -309,7 +339,7 @@ async def get_answer(query: types.CallbackQuery, var=1):
         return
     for answer in answers:
         if answer.img_height > 840:
-            filename = str(time.strftime('tmp/%Y%m%d-%H.%M.%S.jpg'))
+            filename = time.strftime('tmp/%Y%m%d-%H.%M.%S.jpg')
             cv2.imwrite(filename, answer.image)
             file = InputFile(filename)
             await bot.send_document(query.from_user.id, document=file, caption=answer.text,
