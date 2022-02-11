@@ -123,3 +123,9 @@ def is_subscriber(connection, user_id):
 def get_subscribers(connection):
     query_value = execute_read_query(connection, "SELECT * from subscribers")
     return query_value
+
+
+def get_task_where_id_less(connection, id: int, subject: str):
+    query = f"SELECT * FROM posts WHERE body LIKE '%{subject}%' AND id < {id}"
+    found = execute_read_query(connection, query)
+    return found

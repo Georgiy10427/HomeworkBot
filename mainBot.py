@@ -7,18 +7,18 @@ import complete
 import time
 import cv2
 import asyncio
+import random
 from aiogram.types import *
-from aiogram import Bot, Dispatcher, executor, types
+from aiogram import Bot, Dispatcher, executor, types, filters
+import stikers
 
-version = 1.32
+version = 1.33
 
 logging.basicConfig(level=logging.INFO)
 
-# инициализируем бота
 bot = Bot(token=config.API_TOKEN)
 dp = Dispatcher(bot)
 
-# Список всех предметов для парсера
 subjects_names = ['Русский язык', 'Алгебра',
                   'ИЗО', "Литература",
                   'Английский язык', 'Всеобщая история',
@@ -51,7 +51,6 @@ NotificationMSG = """
 
 requests_stat = int()
 
-# Кнопки с названиями предметов
 Russian = InlineKeyboardButton('Русский язык', callback_data='0')
 Algebra = InlineKeyboardButton('Алгебра', callback_data='1')
 Painting = InlineKeyboardButton('ИЗО', callback_data='2')
@@ -69,22 +68,24 @@ SocialScience = InlineKeyboardButton('Обществознание', callback_da
 Geometry = InlineKeyboardButton('Геометрия', callback_data='14')
 Timetable = InlineKeyboardButton('Расписание', url=config.timetable_link)
 
-# Создаём клавиатуру, добавляя в неё выше объявленные кнопки 
+
 keyboard = InlineKeyboardMarkup(row_width=2) \
     .row(Russian, Algebra, Painting) \
     .row(Literature, English).row(History, RussianHistory) \
     .row(Music, Physics, Bio) \
     .row(Geography, Technology) \
     .row(ComputerScience, SocialScience) \
-    .row(Geometry, Timetable)
+    .row(Geometry, Timetable) \
 
-# Создаём другие кнопки: закрыть, подписаться, вернуться в меню 
+
 MessageButtons = InlineKeyboardMarkup(row_width=2).row(
-    InlineKeyboardButton('Меню', callback_data='back'),
+    InlineKeyboardButton('Меню', callback_data='menu'),
+    InlineKeyboardButton('Назад', callback_data='back'),
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
 MessageButtonsWithAnswer = InlineKeyboardMarkup(row_width=2).row(
-    InlineKeyboardButton('Меню', callback_data='back'),
+    InlineKeyboardButton('Меню', callback_data='menu'),
+    InlineKeyboardButton('Назад', callback_data='back'),
     InlineKeyboardButton("Ответ", callback_data='answer'),
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
@@ -93,13 +94,13 @@ SubscribeButtons = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Подписаться', callback_data='subscribe'))
 
 OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
-    InlineKeyboardButton('Подписаться', callback_data='FirstSubscribe'))
+    InlineKeyboardButton('Подписаться', callback_data='first_subscribe'))
 
 CloseButton = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Закрыть', callback_data='delete'))
 
 AnswerButtons = InlineKeyboardMarkup().row(
-    InlineKeyboardButton('Меню', callback_data='back'),
+    InlineKeyboardButton('Меню', callback_data='menu'),
     InlineKeyboardButton('Закрыть', callback_data='delete')
 )
 
@@ -109,25 +110,29 @@ ErrorButtons = InlineKeyboardMarkup().row(
 )
 
 
-# Подключаемся к БД (базе данных)
 connection = sqlite3.connect("database.sqlite")
 dbHandle.create_posts(connection)
 dbHandle.create_subscribers(connection)
 
 
-# Обработчик команды /start
-@dp.message_handler(commands=['start'])
+@dp.message_handler(filters.Command('start', ignore_case=True))
 async def process_start_command(message: types.Message):
-    await message.answer_sticker("CAACAgIAAxkBAAEBO5VgiprjZ-LcWQABw12tF2wzdlqxoyIAAt4AA_R7GQABvYXvbvfFzj0fBA")
-    await message.reply("Привет! Пожалуйста выбери нужный тебе предмет.", reply_markup=keyboard)
-    await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=OnlySubscribeButton)
+    await message.answer_sticker(random.choice(stikers.hi))
+    if dbHandle.is_subscriber(connection, message.from_user.id):
+        await bot.send_message(message.from_user.id,
+                               "Привет! Пожалуйста выбери нужный тебе предмет.",
+                               reply_markup=keyboard)
+        await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=OnlySubscribeButton)
+    else:
+        await bot.send_message(message.from_user.id,
+                               "Выбери нужный тебе предмет:",
+                               reply_markup=keyboard)
     await message.delete()
     global requests_stat
     requests_stat += 1
 
 
-# Обработчик команды /about
-@dp.message_handler(commands=['about'])
+@dp.message_handler(filters.Command('about', ignore_case=True))
 async def process_about_command(message: types.Message):
     await bot.send_message(message.from_user.id, aboutMSG, reply_markup=CloseButton)
     await message.delete()
@@ -135,8 +140,7 @@ async def process_about_command(message: types.Message):
     requests_stat += 1
 
 
-# Обработчик команды /notifications
-@dp.message_handler(commands=['notifications'])
+@dp.message_handler(filters.Command('notifications', ignore_case=True))
 async def process_notifications_command(message: types.Message):
     await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=SubscribeButtons)
     await message.delete()
@@ -144,22 +148,20 @@ async def process_notifications_command(message: types.Message):
     requests_stat += 1
 
 
-@dp.message_handler(commands=['stat'])
+@dp.message_handler(filters.Command('stat', ignore_case=True))
 async def process_stat_command(message: types.Message):
     global requests_stat
     await bot.send_message(message.from_user.id,
-                           f"Статистика\nЗа всё время в онлайне: {requests_stat}",
+                           f"Статистика\nВзаимодействий всего: {requests_stat}",
                            reply_markup=CloseButton)
     await message.delete()
 
 
-# Обработчик других текстовых команд
 @dp.message_handler()
 async def text_answer(message: types.Message):
     global requests_stat
     requests_stat += 1
     command = message.text
-    search_request = ""
     if command.replace("/", "") in subjects_cmd:
         content = get_subject(subjects_cmd[command.replace("/", "")])
         if "|||" in content:
@@ -202,17 +204,9 @@ async def text_answer(message: types.Message):
             except Exception as e:
                 logging.error(e)
                 await message.reply("Возникла ошибка :( \nВозможно, данная публикация не существует ¯\\_(ツ)_/¯")
-    else:
-        for subject in subjects_names:
-            if subject in command:
-                search_request = subject
-                break
-        if search_request != "":
-            await message.reply(get_subject(search_request))
     await message.delete()
 
 
-# Поиск нужного задания:
 def get_subject(subject):
     sub = dbHandle.select_from_key(connection, subject)
     try:
@@ -222,90 +216,181 @@ def get_subject(subject):
         return "Ошибка: не удалось выполнить поиск!"
 
 
-# Обработка кнопок
+def make_task_buttons(has_answer: bool, task_id: int):
+    menu_key = InlineKeyboardButton("Меню", callback_data="menu")
+    back_key = InlineKeyboardButton("Назад", callback_data=f"back={task_id}")
+    answer_key = InlineKeyboardButton("Ответ", callback_data="answer")
+    close_key = InlineKeyboardButton("Закрыть", callback_data="delete")
+    if has_answer:
+        return InlineKeyboardMarkup() \
+            .row(menu_key, back_key, answer_key, close_key)
+    else:
+        return InlineKeyboardMarkup() \
+            .row(menu_key, back_key, close_key)
+
+
+@dp.callback_query_handler(lambda c: str(c.data).isdigit())
+async def get_tasks(query: types.CallbackQuery):
+    subject = subjects_names[int(query.data)]
+    content = dbHandle.select_from_key(connection, subject)[-1]
+    has_answer = "|||" in content[1]
+    reply_markup = make_task_buttons(has_answer, content[0])
+    text = content[-1]
+    if has_answer:
+        text = content[-1].split("|||")[0]
+    text = text.replace("#всёдз", "Задание")
+    await bot.send_message(query.from_user.id,
+                           text,
+                           reply_markup=reply_markup)
+    await bot.answer_callback_query(query.id)
+
+
+@dp.callback_query_handler(lambda c: c.data == "menu")
+async def get_menu(query: types.CallbackQuery):
+    await bot.send_message(query.from_user.id,
+                           "Выбери нужный тебе предмет:",
+                           reply_markup=keyboard)
+    await bot.answer_callback_query(query.id)
+
+
+@dp.callback_query_handler(lambda c: c.data == "delete")
+async def delete_message(query: types.CallbackQuery):
+    try:
+        await query.message.delete()
+    except aiogram.utils.exceptions.MessageCantBeDeleted:
+        await query.answer("Невозможно удалить старое сообщение")
+    except Exception as e:
+        logging.error(e)
+        await query.answer("Произошла неизвестная ошибка")
+    await bot.answer_callback_query(query.id)
+
+
+@dp.callback_query_handler(lambda c: c.data == "subscribe")
+async def subscribe_user(query: types.CallbackQuery):
+    if not dbHandle.is_subscriber(connection, query.from_user.id):
+        dbHandle.subscribe(connection, query.from_user.id)
+        await bot.send_message(query.from_user.id, "Хорошо, я тебя запомнил.", reply_markup=CloseButton)
+    else:
+        await bot.send_message(query.from_user.id,
+                               "Ты уже подписан(а) на рассылку уведомлений. Где-то я тебя раньше видел...",
+                               reply_markup=CloseButton)
+    await bot.answer_callback_query(query.id)
+
+
+@dp.callback_query_handler(lambda c: c.data == "unsubscribe")
+async def unsubscribe_user(query: types.CallbackQuery):
+    if dbHandle.is_subscriber(connection, query.from_user.id):
+        dbHandle.unsubscribe(connection, query.from_user.id)
+        await bot.send_message(query.from_user.id,
+                               "Теперь ты отписан(а) от рассылки.",
+                               reply_markup=CloseButton)
+    else:
+        await bot.send_message(query.from_user.id,
+                               "Кажется, ты и так не подписан(а) на рассылку уведомлений.",
+                               reply_markup=CloseButton)
+    await bot.answer_callback_query(query.id)
+
+
+@dp.callback_query_handler(lambda c: c.data == "first_subscribe")
+async def first_subscribe(query: types.CallbackQuery):
+    if not dbHandle.is_subscriber(connection, query.from_user.id):
+        dbHandle.subscribe(connection, query.from_user.id)
+        await query.message.edit_text("Вы успешно подписались на рассылку.")
+        await query.message.edit_reply_markup(CloseButton)
+    else:
+        await query.message.edit_text("Ты уже был(а) подписан(а) на рассылку.")
+        await query.message.edit_reply_markup(CloseButton)
+    await bot.answer_callback_query(query.id)
+
+
+@dp.callback_query_handler(lambda c: c.data == "answer")
+async def send_answer(query: types.CallbackQuery):
+    try:
+        if "русский язык:" in query.message.text.lower():
+            await get_answer(query, var=2)
+        else:
+            await get_answer(query)
+    except Exception as e:
+        await bot.send_sticker(query.from_user.id, stikers.answer_error)
+        await bot.send_message(query.from_user.id, f"Непредвиденная ошибка: {e}",
+                               reply_markup=ErrorButtons)
+        logging.error(e)
+    await bot.answer_callback_query(query.id)
+
+
+@dp.callback_query_handler(lambda c: c.data == "forward_to_admin")
+async def forward_report(query: types.CallbackQuery):
+    try:
+        await query.message.forward(int(config.owner_id))
+        await query.answer("Отчёт успешно отправлен.")
+    except Exception as e:
+        await bot.send_sticker(query.from_user.id, stikers.error_report)
+        await bot.send_message(query.from_user.id, f"Не удалось отправить отчёт, ошибка: {e}",
+                               reply_markup=CloseButton)
+        logging.error(e)
+    await bot.answer_callback_query(query.id)
+
+
+back_cmd = \
+    lambda c: \
+    str(c.data).split("=")[0] == "back" \
+    and str(c.data).split("=")[1].isdigit()
+
+
+@dp.callback_query_handler(back_cmd)
+async def get_prev_task(query: types.CallbackQuery):
+    await get_prev_note(query, query.message)
+    await bot.answer_callback_query(query.id)
+
+
 @dp.callback_query_handler(lambda c: c.data)
-async def process_callback_buttons(callback_query: types.CallbackQuery):
+async def count_stat():
     global requests_stat
     requests_stat += 1
-    code = callback_query.data
-    # Обработка школьных предметов:
-    if str(code).isdigit():
-        if 0 <= int(code) < len(subjects_names):
-            content = get_subject(subjects_names[int(code)])
-            if "|||" in content:
-                await bot.send_message(callback_query.from_user.id,
-                                       content.split("|||")[0],
-                                       reply_markup=MessageButtonsWithAnswer)
-            else:
-                await bot.send_message(callback_query.from_user.id,
-                                       content.split("|||")[0], reply_markup=MessageButtons)
-        else:
-            logging.error(f"The code {code} the out of range.")
-    # Возврат к меню
-    elif code == 'back':
-        await bot.send_message(callback_query.from_user.id, "Выбери нужный тебе предмет:", reply_markup=keyboard)
-    # Удаление сообщения
-    elif code == 'delete':
-        try:
-            await callback_query.message.delete()
-        except aiogram.utils.exceptions.MessageCantBeDeleted:
-            await callback_query.answer("Невозможно удалить старое сообщение")
-        except Exception as e:
-            logging.error(e)
-            await callback_query.answer("Произошла неизвестная ошибка")
 
-    # Подписываем пользователя к рассылке
-    elif code == 'subscribe':
-        if not dbHandle.is_subscriber(connection, callback_query.from_user.id):
-            dbHandle.subscribe(connection, callback_query.from_user.id)
-            await bot.send_message(callback_query.from_user.id, "Хорошо, я тебя запомнил.", reply_markup=CloseButton)
-        else:
-            await bot.send_message(callback_query.from_user.id,
-                                   "Ты уже подписан(а) на рассылку уведомлений. Где-то я тебя раньше видел...",
-                                   reply_markup=CloseButton)
-    # Отписываем пользователя от рассылки
-    elif code == 'unsubscribe':
-        if dbHandle.is_subscriber(connection, callback_query.from_user.id):
-            dbHandle.unsubscribe(connection, callback_query.from_user.id)
-            await bot.send_message(callback_query.from_user.id,
-                                   "Теперь ты отписан(а) от рассылки.",
-                                   reply_markup=CloseButton)
-        else:
-            await bot.send_message(callback_query.from_user.id,
-                                   "Кажется, ты и так не подписан(а) на рассылку уведомлений.",
-                                   reply_markup=CloseButton)
-    # Обработка предложения подписки на рассылку (при активации)
-    elif code == 'FirstSubscribe':
-        if not dbHandle.is_subscriber(connection, callback_query.from_user.id):
-            dbHandle.subscribe(connection, callback_query.from_user.id)
-            await callback_query.message.edit_text("Вы успешно подписались на рассылку.")
-            await callback_query.message.edit_reply_markup(CloseButton)
-        else:
-            await callback_query.message.edit_text("Ты уже был(а) подписан(а) на рассылку.")
-            await callback_query.message.edit_reply_markup(CloseButton)
-    # Поиск GDZ
-    elif code == "answer":
-        try:
-            if "русский язык:" in callback_query.message.text.lower():
-                await get_answer(callback_query, var=2)
-            else:
-                await get_answer(callback_query)
-        except Exception as e:
-            await bot.send_sticker(callback_query.from_user.id,
-                                   "CAACAgUAAxkBAAEDOpZhhmHGlrx_q_QZoniqGX7HSXDypwACHAAD1UnhJlt52LObeelbIgQ")
-            await bot.send_message(callback_query.from_user.id, f"Непредвиденная ошибка: {e}",
-                                   reply_markup=ErrorButtons)
-    # Пересылка отчёта админу
-    elif code == "forward_to_admin":
-        try:
-            await callback_query.message.forward(config.owner_id)
-            await callback_query.answer("Отчёт успешно отправлен.")
-        except Exception as e:
-            await bot.send_sticker(callback_query.from_user.id,
-                                   "CAACAgUAAxkBAAEDOphhhmHRpuN8ho11CFk9bvnliCk7WAACIAAD1UnhJqrJn62Al-93IgQ")
-            await bot.send_message(callback_query.from_user.id, f"Не удалось отправить отчёт, ошибка: {e}",
-                                   reply_markup=CloseButton)
-    await bot.answer_callback_query(callback_query.id)
+
+async def get_prev_note(query, message: types.Message):
+    try:
+        current_id = int(query.data.split("=")[1])
+    except Exception as e:
+        logging.error(e)
+        await query.answer("Неверный запрос")
+    try:
+        text_message: str = message.text.split("\n")[1]
+        subject = text_message.split(":")[0]
+    except Exception as e:
+        logging.error(e)
+        await query.answer("Девиантная публикация")
+        return None
+
+    try:
+        prev_note = dbHandle.get_task_where_id_less(connection, current_id, subject)[-1]
+        prev_note_id = prev_note[0]
+        prev_note = prev_note[-1]
+    except IndexError:
+        prev_note = dbHandle.select_from_key(connection, subject)[-1]
+        prev_note_id = prev_note[0]
+        has_answer = "|||" in prev_note[1]
+        reply_markup = make_task_buttons(has_answer, prev_note_id)
+        if has_answer:
+            prev_note = prev_note[-1].split("|||")[0]
+        await message.edit_text(cut_subject(subject, prev_note))
+        await message.edit_reply_markup(reply_markup)
+        await query.answer("Вы пролистали все задания")
+        return None
+    has_answer = False
+    try:
+        note = cut_subject(subject, prev_note)
+        has_answer = "|||" in note
+        reply_markup = make_task_buttons(has_answer, prev_note_id)
+        prev_note = note
+        if has_answer:
+            prev_note = note.split("|||")[0]
+    except Exception as e:
+        logging.error(e)
+        prev_note = f"Ошибка поиска: {e}"
+    await message.edit_text(prev_note)
+    await message.edit_reply_markup(reply_markup)
 
 
 async def get_answer(query: types.CallbackQuery, var=1):
@@ -331,8 +416,7 @@ async def get_answer(query: types.CallbackQuery, var=1):
         if type(answers) != list:
             raise answers
     except Exception as e:
-        await bot.send_sticker(query.from_user.id,
-                               "CAACAgUAAxkBAAEDOpZhhmHGlrx_q_QZoniqGX7HSXDypwACHAAD1UnhJlt52LObeelbIgQ")
+        await bot.send_sticker(query.from_user.id, stikers.answer_error)
         await bot.send_message(query.from_user.id,
                                f"Ошибка сетевого соединения (сервер): {e}",
                                reply_markup=ErrorButtons)
@@ -369,7 +453,6 @@ async def next_answer(query: types.CallbackQuery):
     await query.message.edit_media(complete.cv_to_bytes(task_answer.image))
 
 
-# Парсер, отделяет нужное задание от всех остальных
 def cut_subject(subject, post):
     date = ""
     for line in post.split('\n'):
@@ -384,6 +467,5 @@ def cut_subject(subject, post):
             return date + '\n' + i
 
 
-# Запускаем бота
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
