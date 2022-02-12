@@ -10,7 +10,7 @@ import asyncio
 import random
 from aiogram.types import *
 from aiogram import Bot, Dispatcher, executor, types, filters
-import stikers
+import stickers
 
 version = 1.33
 
@@ -48,8 +48,6 @@ NotificationMSG = """
 Если ты подпишешься на рассылку, то будешь получать уведомления о обновлениях заданий.
 Ты в любой момент сможешь изменить свой выбор командой /notifications
 """
-
-requests_stat = int()
 
 Russian = InlineKeyboardButton('Русский язык', callback_data='0')
 Algebra = InlineKeyboardButton('Алгебра', callback_data='1')
@@ -91,6 +89,7 @@ MessageButtonsWithAnswer = InlineKeyboardMarkup(row_width=2).row(
 
 SubscribeButtons = InlineKeyboardMarkup(row_width=2).row(
     InlineKeyboardButton('Отписаться', callback_data='unsubscribe'),
+    InlineKeyboardButton('Закрыть', callback_data='delete'),
     InlineKeyboardButton('Подписаться', callback_data='subscribe'))
 
 OnlySubscribeButton = InlineKeyboardMarkup(row_width=2).row(
@@ -117,8 +116,8 @@ dbHandle.create_subscribers(connection)
 
 @dp.message_handler(filters.Command('start', ignore_case=True))
 async def process_start_command(message: types.Message):
-    await message.answer_sticker(random.choice(stikers.hi))
-    if dbHandle.is_subscriber(connection, message.from_user.id):
+    await message.answer_sticker(random.choice(stickers.hi))
+    if not dbHandle.is_subscriber(connection, message.from_user.id):
         await bot.send_message(message.from_user.id,
                                "Привет! Пожалуйста выбери нужный тебе предмет.",
                                reply_markup=keyboard)
@@ -128,75 +127,84 @@ async def process_start_command(message: types.Message):
                                "Выбери нужный тебе предмет:",
                                reply_markup=keyboard)
     await message.delete()
-    global requests_stat
-    requests_stat += 1
 
 
 @dp.message_handler(filters.Command('about', ignore_case=True))
 async def process_about_command(message: types.Message):
     await bot.send_message(message.from_user.id, aboutMSG, reply_markup=CloseButton)
     await message.delete()
-    global requests_stat
-    requests_stat += 1
 
 
 @dp.message_handler(filters.Command('notifications', ignore_case=True))
 async def process_notifications_command(message: types.Message):
     await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=SubscribeButtons)
     await message.delete()
-    global requests_stat
-    requests_stat += 1
 
 
-@dp.message_handler(filters.Command('stat', ignore_case=True))
-async def process_stat_command(message: types.Message):
-    global requests_stat
-    await bot.send_message(message.from_user.id,
-                           f"Статистика\nВзаимодействий всего: {requests_stat}",
-                           reply_markup=CloseButton)
-    await message.delete()
+@dp.message_handler(filters.Command('clear_history_notification'))
+async def clear_history_notification(message: types.Message):
+    if message.from_user.id != config.owner_id:
+        return None
+    subscribers = dbHandle.get_subscribers(connection)
+    notification = "Мы обновили чат бота. Пожалуйста очистите историю чата во избежании ошибок"
+    for user in subscribers:
+        await asyncio.sleep(0.2)
+        try:
+            await bot.send_sticker(user[1], stickers.update)
+            await bot.send_message(user[1], notification, reply_markup=CloseButton)
+        except Exception as e:
+            logging.error(f"{e}: {user[1]}")
+            continue
+
+
+@dp.message_handler(filters.Command('notify'))
+async def send_notification(message: types.Message):
+    if message.from_user.id != config.owner_id:
+        return None
+    subscribers = dbHandle.get_subscribers(connection)
+    notification = message.text.replace("/notify ", "")
+    notification = notification.replace("/notify", "")
+    if notification == "":
+        return None
+    for user in subscribers:
+        await asyncio.sleep(0.2)
+        try:
+            await bot.send_message(user[1], notification, reply_markup=CloseButton)
+        except Exception as e:
+            logging.error(f"{e}: {user[1]}")
+            continue
 
 
 @dp.message_handler()
 async def text_answer(message: types.Message):
-    global requests_stat
-    requests_stat += 1
-    command = message.text
-    if command.replace("/", "") in subjects_cmd:
-        content = get_subject(subjects_cmd[command.replace("/", "")])
-        if "|||" in content:
-            await bot.send_message(message.from_user.id,
-                                   content.split("|||")[0],
-                                   reply_markup=MessageButtonsWithAnswer)
-        else:
-            await bot.send_message(message.from_user.id,
-                                   content.split("|||")[0], reply_markup=MessageButtons)
-    elif timetable_cmd in command.replace("/", ""):
+    command = message.text.replace("/", "")
+    if command in subjects_cmd:
+        subject = subjects_cmd[command]
+        content = dbHandle.select_from_key(connection, subject)[-1]
+        has_answer = "|||" in cut_subject(subject, content[1])
+        reply_markup = make_task_buttons(has_answer, content[0])
+        text = cut_subject(subject, content[1])
+        if has_answer:
+            text = cut_subject(subject, content[1]).split("|||")[0]
+        await bot.send_message(message.from_user.id,
+                               text,
+                               reply_markup=reply_markup)
+    elif timetable_cmd in command:
         await bot.send_message(message.from_user.id,
                                "Ссылка на расписание",
                                reply_markup=InlineKeyboardMarkup()
                                .row(Timetable))
-    elif message.from_user.id == config.owner_id and "/" in command:
-        if "/add" in command:
+    elif message.from_user.id == config.owner_id:
+        if "add" in command:
             dbHandle.add_post(connection, message.text.replace("/add ", ""))
             await message.reply("Добавлено!")
-        elif "/edit" in command:
+        elif "edit" in command:
             parts = command.replace("/edit ", "").split(' && ')
             old_post = dbHandle.select_from_key(connection, parts[0])[-1][-1]
             dbHandle.update_from_key(connection, parts[0], parts[1])
             new_post = dbHandle.select_from_key(connection, parts[1])[-1][-1]
             await message.reply(f"Отредактированно. До редактирования: \n {old_post} \n После: \n  {new_post}")
-        elif "/notify" in command:
-            subscribers = dbHandle.get_subscribers(connection)
-            notification = command.replace("/notify ", "")
-            for user in subscribers:
-                await asyncio.sleep(0.2)
-                try:
-                    await bot.send_message(user[1], notification, reply_markup=CloseButton)
-                except Exception as e:
-                    logging.error(f"{e}: {user[1]}")
-                    continue
-        elif "/delete" in command:
+        elif "delete" in command:
             post = dbHandle.select_from_key(connection, message.text.replace("/delete ", ""))
             dbHandle.delete_from_key(connection, message.text.replace("/delete ", ""))
             try:
@@ -204,13 +212,16 @@ async def text_answer(message: types.Message):
             except Exception as e:
                 logging.error(e)
                 await message.reply("Возникла ошибка :( \nВозможно, данная публикация не существует ¯\\_(ツ)_/¯")
+    if command == "clear_history_notification" \
+       or command == "notify":
+        return
     await message.delete()
 
 
 def get_subject(subject):
     sub = dbHandle.select_from_key(connection, subject)
     try:
-        return cut_subject(subject, sub[-1][1])
+        return cut_subject(subject, sub[-1])
     except Exception as e:
         logging.error(e)
         return "Ошибка: не удалось выполнить поиск!"
@@ -233,11 +244,11 @@ def make_task_buttons(has_answer: bool, task_id: int):
 async def get_tasks(query: types.CallbackQuery):
     subject = subjects_names[int(query.data)]
     content = dbHandle.select_from_key(connection, subject)[-1]
-    has_answer = "|||" in content[1]
+    has_answer = "|||" in cut_subject(subject, content[-1])
     reply_markup = make_task_buttons(has_answer, content[0])
-    text = content[-1]
+    text = cut_subject(subject, content[-1])
     if has_answer:
-        text = content[-1].split("|||")[0]
+        text = text.split("|||")[0]
     text = text.replace("#всёдз", "Задание")
     await bot.send_message(query.from_user.id,
                            text,
@@ -311,7 +322,7 @@ async def send_answer(query: types.CallbackQuery):
         else:
             await get_answer(query)
     except Exception as e:
-        await bot.send_sticker(query.from_user.id, stikers.answer_error)
+        await bot.send_sticker(query.from_user.id, stickers.answer_error)
         await bot.send_message(query.from_user.id, f"Непредвиденная ошибка: {e}",
                                reply_markup=ErrorButtons)
         logging.error(e)
@@ -324,7 +335,7 @@ async def forward_report(query: types.CallbackQuery):
         await query.message.forward(int(config.owner_id))
         await query.answer("Отчёт успешно отправлен.")
     except Exception as e:
-        await bot.send_sticker(query.from_user.id, stikers.error_report)
+        await bot.send_sticker(query.from_user.id, stickers.error_report)
         await bot.send_message(query.from_user.id, f"Не удалось отправить отчёт, ошибка: {e}",
                                reply_markup=CloseButton)
         logging.error(e)
@@ -341,12 +352,6 @@ back_cmd = \
 async def get_prev_task(query: types.CallbackQuery):
     await get_prev_note(query, query.message)
     await bot.answer_callback_query(query.id)
-
-
-@dp.callback_query_handler(lambda c: c.data)
-async def count_stat():
-    global requests_stat
-    requests_stat += 1
 
 
 async def get_prev_note(query, message: types.Message):
@@ -393,6 +398,13 @@ async def get_prev_note(query, message: types.Message):
     await message.edit_reply_markup(reply_markup)
 
 
+def get_src_task(message: types.Message):
+    task = message.text.split("\n")[1]
+    subject = task.split(":")[0]
+    src_note = dbHandle.select_from_key(connection, task)[-1][-1]
+    return cut_subject(subject, src_note)
+
+
 async def get_answer(query: types.CallbackQuery, var=1):
     text_message: str = query.message.text
     current_subject: str = ""
@@ -406,7 +418,7 @@ async def get_answer(query: types.CallbackQuery, var=1):
         return
 
     try:
-        numbers: list = get_subject(current_subject) \
+        numbers: list = get_src_task(query.message) \
                             .split("|||")[1].replace(" ", "").replace("\n", "").split(",")
     except IndexError:
         await query.answer("Ошибка: не удалось определить номер задания.")
@@ -416,7 +428,7 @@ async def get_answer(query: types.CallbackQuery, var=1):
         if type(answers) != list:
             raise answers
     except Exception as e:
-        await bot.send_sticker(query.from_user.id, stikers.answer_error)
+        await bot.send_sticker(query.from_user.id, stickers.answer_error)
         await bot.send_message(query.from_user.id,
                                f"Ошибка сетевого соединения (сервер): {e}",
                                reply_markup=ErrorButtons)
