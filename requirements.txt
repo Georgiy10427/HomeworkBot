@@ -1,5 +1,5 @@
 aiogram~=2.15
-#opencv-python~=4.5.1.48
+opencv-python~=4.5.1.48
 requests~=2.20.0
 #numpy~=1.21.2
 bs4~=0.0.1
