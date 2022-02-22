@@ -1,3 +1,7 @@
+# Ignore user files
+config.py
+database.sqlite
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -127,7 +131,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-
-#Ignore user files
-config.py
-database.sqlite

@@ -73,7 +73,6 @@ def get_content(url: str, var_number=1):
     images = variants[var_number-1].find_all("img")
     for i in images:
         task_images.append(f'https:{i.attrs["src"]}')
-    print()
     return task_images
 
 
@@ -117,7 +116,6 @@ def get_tasks_urls(subject_name: str, numbers: list, school_class: int):
                     continue
             else:
                 logging.error(f"Неверный номер задания: {number}")
-            print(link)
         else:
             logging.error(f"Некорректный номер задания: {number}")
     return tasks
