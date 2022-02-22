@@ -13,7 +13,7 @@ import stickers
 import concurrent.futures
 
 
-version = 1.33
+version = 1.34
 
 logging.basicConfig(level=logging.INFO)
 
