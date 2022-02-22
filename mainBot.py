@@ -110,14 +110,16 @@ ErrorButtons = InlineKeyboardMarkup().row(
 )
 
 
-#asyncio.run(dbHandle.create_posts(dbHandle.get_url()))
-#asyncio.run(dbHandle.create_subscribers(dbHandle.get_url()))
+async def create_tables():
+    await dbHandle.create_posts(dbHandle.get_url())
+    await dbHandle.create_subscribers(dbHandle.get_url())
 
 
 @dp.message_handler(filters.Command('start', ignore_case=True))
 async def process_start_command(message: types.Message):
     await message.answer_sticker(random.choice(stickers.hi))
-    if not await dbHandle.is_subscriber(dbHandle.get_url(), message.from_user.id):
+    is_subscribe = await dbHandle.is_subscriber(dbHandle.get_url(), message.from_user.id)
+    if not is_subscribe:
         await bot.send_message(message.from_user.id,
                                "Привет! Пожалуйста выбери нужный тебе предмет.",
                                reply_markup=keyboard)
@@ -278,7 +280,8 @@ async def subscribe_user(query: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda c: c.data == "unsubscribe")
 async def unsubscribe_user(query: types.CallbackQuery):
-    if dbHandle.is_subscriber(dbHandle.get_url(), query.from_user.id):
+    is_subscriber = await dbHandle.is_subscriber(dbHandle.get_url(), query.from_user.id)
+    if is_subscriber:
         await dbHandle.unsubscribe(dbHandle.get_url(), query.from_user.id)
         await bot.send_message(query.from_user.id,
                                "Теперь ты отписан(а) от рассылки.",
@@ -330,10 +333,8 @@ async def forward_report(query: types.CallbackQuery):
     await bot.answer_callback_query(query.id)
 
 
-back_cmd = \
-    lambda c: \
-    str(c.data).split("=")[0] == "back" \
-    and str(c.data).split("=")[1].isdigit()
+def back_cmd(c):
+    return str(c.data).split("=")[0] == "back" and str(c.data).split("=")[1].isdigit()
 
 
 @dp.callback_query_handler(back_cmd)
@@ -360,7 +361,7 @@ async def get_prev_note(query, message: types.Message):
         prev_note = await dbHandle.get_task_where_id_less(dbHandle.get_url(), current_id, subject)
         prev_note = prev_note[-1]
         prev_note_id = prev_note[0]
-        prev_note = prev_note[-1]
+        prev_note = prev_note[1]
     except IndexError:
         prev_note = await dbHandle.select_from_key(dbHandle.get_url(), subject)
         prev_note = prev_note[-1]
@@ -368,8 +369,9 @@ async def get_prev_note(query, message: types.Message):
         has_answer = "|||" in prev_note[1]
         reply_markup = make_task_buttons(has_answer, prev_note_id)
         if has_answer:
-            prev_note = prev_note[-1].split("|||")[0]
-        await message.edit_text(cut_subject(subject, prev_note))
+            prev_note = prev_note[1].split("|||")[0]
+        print(cut_subject(subject, prev_note[1]))
+        await message.edit_text(cut_subject(subject, prev_note[1]))
         await message.edit_reply_markup(reply_markup)
         await query.answer("Вы пролистали все задания")
         return None
@@ -473,7 +475,10 @@ def cut_subject(subject, post):
     for i in subjects:
         if subject in i:
             return date + '\n' + i
+    return
 
 
 if __name__ == '__main__':
+    # Need to fix:
+    # dp.loop.create_task(create_tables())
     executor.start_polling(dp, skip_updates=True)

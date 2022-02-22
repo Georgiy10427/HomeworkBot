@@ -42,6 +42,7 @@ class Task(object):
     max_variant_value = 0
 
 
+# Need to cache
 def get_image(url: str):
     try:
         response = requests.get(url, stream=True).raw
@@ -121,6 +122,7 @@ def get_tasks_urls(subject_name: str, numbers: list, school_class: int):
     return tasks
 
 
+# Need to cache
 def fold_images(images: list):
     return cv2.vconcat(images)
 
