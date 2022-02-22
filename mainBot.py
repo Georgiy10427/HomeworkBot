@@ -10,8 +10,8 @@ import random
 from aiogram.types import *
 from aiogram import Bot, Dispatcher, executor, types, filters
 import stickers
-import threading
 import concurrent.futures
+
 
 version = 1.33
 
