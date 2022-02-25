@@ -192,19 +192,17 @@ async def text_answer(message: types.Message):
         await bot.send_message(message.from_user.id,
                                text,
                                reply_markup=reply_markup)
+        await message.delete()
     elif timetable_cmd in command:
         await bot.send_message(message.from_user.id,
                                "Ссылка на расписание",
                                reply_markup=InlineKeyboardMarkup()
                                .row(Timetable))
+        await message.delete()
     elif message.from_user.id == config.owner_id:
         if "add" in command:
             await dbHandle.add_post(dbHandle.get_url(), message.text.replace("/add ", ""))
             await message.reply("Добавлено!")
-    if command == "clear_history_notification" \
-       or command == "notify":
-        return
-    await message.delete()
 
 
 async def get_subject(subject):
