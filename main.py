@@ -4,31 +4,34 @@ import logging
 import dbHandle
 import complete
 import time
-import cv2
 import asyncio
 import random
 from aiogram.types import *
 from aiogram import Bot, Dispatcher, executor, types, filters
 import stickers
 import concurrent.futures
+from io import BytesIO
 
 
-version = 1.34
+__version__: float = 1.34
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=config.API_TOKEN)
-dp = Dispatcher(bot)
+bot: aiogram.bot.Bot = Bot(token=config.API_TOKEN)
+dp: aiogram.dispatcher.Dispatcher = Dispatcher(bot)
 
-subjects_names = ['Русский язык', 'Алгебра',
+subjects_names: list = [
+                  'Русский язык', 'Алгебра',
                   'ИЗО', "Литература",
                   'Английский язык', 'Всеобщая история',
                   'История России',
                   'Музыка', 'Физика', 'Биология',
                   'География', "Технология",
-                  "Информатика", 'Обществознание', 'Геометрия']
+                  "Информатика", 'Обществознание', 'Геометрия'
+]
 
-subjects_cmd = {"russian": "Русский язык", "algebra": "Алгебра",
+subjects_cmd: dict = {
+                "russian": "Русский язык", "algebra": "Алгебра",
                 "art": "ИЗО", "literature": "Литература",
                 "english": "Английский язык",
                 "history": "Всеобщая история",
@@ -38,14 +41,14 @@ subjects_cmd = {"russian": "Русский язык", "algebra": "Алгебра
                 "technology": "Технология", "informatics": "Информатика",
                 "social_studies": "Обществознание", "geometry": "Геометрия"}
 
-timetable_cmd = "timetable"
+timetable_cmd: str = "timetable"
 
-aboutMSG = """
+aboutMSG: str = """
 Бот призван помочь вам в поиске нужного домашнего задания. Сделан с акцентом на простоту и удобство)
 Программа полностью свободна, с открытым исходным кодом.
 Github (исходный код): https://github.com/Georgiy10427/HomeworkBot
 """
-NotificationMSG = """
+NotificationMSG: str = """
 Если ты подпишешься на рассылку, то будешь получать уведомления о обновлениях заданий.
 Ты в любой момент сможешь изменить свой выбор командой /notifications
 """
@@ -68,7 +71,7 @@ Geometry = InlineKeyboardButton('Геометрия', callback_data='14')
 Timetable = InlineKeyboardButton('Расписание', url=config.timetable_link)
 
 
-keyboard = InlineKeyboardMarkup(row_width=2) \
+keyboard: InlineKeyboardMarkup = InlineKeyboardMarkup(row_width=2) \
     .row(Russian, Algebra, Painting) \
     .row(Literature, English).row(History, RussianHistory) \
     .row(Music, Physics, Bio) \
@@ -109,14 +112,17 @@ ErrorButtons = InlineKeyboardMarkup().row(
     InlineKeyboardButton("Закрыть", callback_data="delete")
 )
 
+running_processes: dict = dict()
 
-async def create_tables():
-    await dbHandle.create_posts(dbHandle.get_url())
-    await dbHandle.create_subscribers(dbHandle.get_url())
+
+class RunningProcess:
+    user_id = 0
+    message_id = 0
+    callback_name = ""
 
 
 @dp.message_handler(filters.Command('start', ignore_case=True))
-async def process_start_command(message: types.Message):
+async def process_start_command(message: types.Message) -> None:
     await message.answer_sticker(random.choice(stickers.hi))
     is_subscribe = await dbHandle.is_subscriber(dbHandle.get_url(), message.from_user.id)
     if not is_subscribe:
@@ -132,19 +138,19 @@ async def process_start_command(message: types.Message):
 
 
 @dp.message_handler(filters.Command('about', ignore_case=True))
-async def process_about_command(message: types.Message):
+async def process_about_command(message: types.Message) -> None:
     await bot.send_message(message.from_user.id, aboutMSG, reply_markup=CloseButton)
     await message.delete()
 
 
 @dp.message_handler(filters.Command('notifications', ignore_case=True))
-async def process_notifications_command(message: types.Message):
+async def process_notifications_command(message: types.Message) -> None:
     await bot.send_message(message.from_user.id, NotificationMSG, reply_markup=SubscribeButtons)
     await message.delete()
 
 
 @dp.message_handler(filters.Command('clear_history_notification'))
-async def clear_history_notification(message: types.Message):
+async def clear_history_notification(message: types.Message) -> None:
     if message.from_user.id != config.owner_id:
         return None
     subscribers = await dbHandle.get_subscribers(dbHandle.get_url())
@@ -160,11 +166,11 @@ async def clear_history_notification(message: types.Message):
 
 
 @dp.message_handler(filters.Command('notify'))
-async def send_notification(message: types.Message):
+async def send_notification(message: types.Message) -> None:
     if message.from_user.id != config.owner_id:
         return None
-    subscribers = await dbHandle.get_subscribers(dbHandle.get_url())
-    notification = message.text.replace("/notify ", "")
+    subscribers: list = await dbHandle.get_subscribers(dbHandle.get_url())
+    notification: str = message.text.replace("/notify ", "")
     notification = notification.replace("/notify", "")
     if notification == "":
         return None
@@ -178,11 +184,11 @@ async def send_notification(message: types.Message):
 
 
 @dp.message_handler()
-async def text_answer(message: types.Message):
-    command = message.text.replace("/", "")
+async def text_answer(message: types.Message) -> None:
+    command: str = message.text.replace("/", "")
     if command in subjects_cmd:
-        subject = subjects_cmd[command]
-        content = await dbHandle.select_from_key(dbHandle.get_url(), subject)
+        subject: str = subjects_cmd[command]
+        content: list = await dbHandle.select_from_key(dbHandle.get_url(), subject)
         content = content[-1]
         has_answer = "|||" in cut_subject(subject, content[1])
         reply_markup = make_task_buttons(has_answer, content[0])
@@ -205,8 +211,8 @@ async def text_answer(message: types.Message):
             await message.reply("Добавлено!")
 
 
-async def get_subject(subject):
-    sub = await dbHandle.select_from_key(dbHandle.get_url(), subject)
+async def get_subject(subject) -> str:
+    sub: list = await dbHandle.select_from_key(dbHandle.get_url(), subject)
     try:
         return cut_subject(subject, sub[-1])
     except Exception as e:
@@ -214,7 +220,7 @@ async def get_subject(subject):
         return "Ошибка: не удалось выполнить поиск!"
 
 
-def make_task_buttons(has_answer: bool, task_id: int):
+def make_task_buttons(has_answer: bool, task_id: int) -> aiogram.types.InlineKeyboardMarkup:
     menu_key = InlineKeyboardButton("Меню", callback_data="menu")
     back_key = InlineKeyboardButton("Назад", callback_data=f"back={task_id}")
     answer_key = InlineKeyboardButton("Ответ", callback_data="answer")
@@ -228,13 +234,13 @@ def make_task_buttons(has_answer: bool, task_id: int):
 
 
 @dp.callback_query_handler(lambda c: str(c.data).isdigit())
-async def get_tasks(query: types.CallbackQuery):
-    subject = subjects_names[int(query.data)]
-    content = await dbHandle.select_from_key(dbHandle.get_url(), subject)
+async def get_tasks(query: types.CallbackQuery) -> None:
+    subject: str = subjects_names[int(query.data)]
+    content: list = await dbHandle.select_from_key(dbHandle.get_url(), subject)
     content = content[-1]
-    has_answer = "|||" in cut_subject(subject, content[-1])
+    has_answer: bool = "|||" in cut_subject(subject, content[-1])
     reply_markup = make_task_buttons(has_answer, content[0])
-    text = cut_subject(subject, content[-1])
+    text: str = cut_subject(subject, content[-1])
     if has_answer:
         text = text.split("|||")[0]
     text = text.replace("#всёдз", "Задание")
@@ -245,7 +251,7 @@ async def get_tasks(query: types.CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: c.data == "menu")
-async def get_menu(query: types.CallbackQuery):
+async def get_menu(query: types.CallbackQuery) -> None:
     await bot.send_message(query.from_user.id,
                            "Выбери нужный тебе предмет:",
                            reply_markup=keyboard)
@@ -253,7 +259,7 @@ async def get_menu(query: types.CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: c.data == "delete")
-async def delete_message(query: types.CallbackQuery):
+async def delete_message(query: types.CallbackQuery) -> None:
     try:
         await query.message.delete()
     except aiogram.utils.exceptions.MessageCantBeDeleted:
@@ -265,7 +271,7 @@ async def delete_message(query: types.CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: c.data == "subscribe")
-async def subscribe_user(query: types.CallbackQuery):
+async def subscribe_user(query: types.CallbackQuery) -> None:
     if not await dbHandle.is_subscriber(dbHandle.get_url(), query.from_user.id):
         await dbHandle.subscribe(dbHandle.get_url(), query.from_user.id)
         await bot.send_message(query.from_user.id, "Хорошо, я тебя запомнил.", reply_markup=CloseButton)
@@ -277,7 +283,7 @@ async def subscribe_user(query: types.CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: c.data == "unsubscribe")
-async def unsubscribe_user(query: types.CallbackQuery):
+async def unsubscribe_user(query: types.CallbackQuery) -> None:
     is_subscriber = await dbHandle.is_subscriber(dbHandle.get_url(), query.from_user.id)
     if is_subscriber:
         await dbHandle.unsubscribe(dbHandle.get_url(), query.from_user.id)
@@ -292,7 +298,7 @@ async def unsubscribe_user(query: types.CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: c.data == "first_subscribe")
-async def first_subscribe(query: types.CallbackQuery):
+async def first_subscribe(query: types.CallbackQuery) -> None:
     if not await dbHandle.is_subscriber(dbHandle.get_url(), query.from_user.id):
         await dbHandle.subscribe(dbHandle.get_url(), query.from_user.id)
         await query.message.edit_text("Вы успешно подписались на рассылку.")
@@ -304,7 +310,7 @@ async def first_subscribe(query: types.CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: c.data == "answer")
-async def send_answer(query: types.CallbackQuery):
+async def send_answer(query: types.CallbackQuery) -> None:
     try:
         if "русский язык:" in query.message.text.lower():
             await get_answer(query, var=2)
@@ -319,7 +325,7 @@ async def send_answer(query: types.CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: c.data == "forward_to_admin")
-async def forward_report(query: types.CallbackQuery):
+async def forward_report(query: types.CallbackQuery) -> None:
     try:
         await query.message.forward(int(config.owner_id))
         await query.answer("Отчёт успешно отправлен.")
@@ -331,17 +337,20 @@ async def forward_report(query: types.CallbackQuery):
     await bot.answer_callback_query(query.id)
 
 
-def back_cmd(c):
-    return str(c.data).split("=")[0] == "back" and str(c.data).split("=")[1].isdigit()
+def back_cmd(c) -> bool:
+    return str(c.data).split("=")[0] == "back" \
+           and str(c.data).split("=")[1].isdigit()
 
 
 @dp.callback_query_handler(back_cmd)
-async def get_prev_task(query: types.CallbackQuery):
+async def get_prev_task(query: types.CallbackQuery) -> None:
     await get_prev_note(query, query.message)
     await bot.answer_callback_query(query.id)
 
 
-async def get_prev_note(query, message: types.Message):
+async def get_prev_note(query, message: types.Message) -> None:
+    current_id: int = 0
+    reply_markup: aiogram.types.InlineKeyboardMarkup = InlineKeyboardMarkup()
     try:
         current_id = int(query.data.split("=")[1])
     except Exception as e:
@@ -373,10 +382,9 @@ async def get_prev_note(query, message: types.Message):
         await message.edit_reply_markup(reply_markup)
         await query.answer("Вы пролистали все задания")
         return None
-    has_answer = False
     try:
         note = cut_subject(subject, prev_note)
-        has_answer = "|||" in note
+        has_answer: bool = "|||" in note
         reply_markup = make_task_buttons(has_answer, prev_note_id)
         prev_note = note
         if has_answer:
@@ -388,7 +396,7 @@ async def get_prev_note(query, message: types.Message):
     await message.edit_reply_markup(reply_markup)
 
 
-async def get_src_task(message: types.Message):
+async def get_src_task(message: types.Message) -> str:
     task = message.text.split("\n")[1]
     subject = task.split(":")[0]
     src_note = await dbHandle.select_from_key(dbHandle.get_url(), task)
@@ -396,9 +404,9 @@ async def get_src_task(message: types.Message):
     return cut_subject(subject, src_note)
 
 
-async def get_answer(query: types.CallbackQuery, var=1):
+async def get_answer(query: types.CallbackQuery, var=1) -> None:
     text_message: str = query.message.text
-    current_subject: str = ""
+    # current_subject: str = ""
 
     for subject in subjects_names:
         if subject in text_message:
@@ -431,9 +439,8 @@ async def get_answer(query: types.CallbackQuery, var=1):
         return
     for answer in answers:
         if answer.img_height > 840:
-            filename = time.strftime('tmp/%Y%m%d-%H.%M.%S.jpg')
-            cv2.imwrite(filename, answer.image)
-            file = InputFile(filename)
+            filename = time.strftime('%Y%m%d-%H.%M.%S.jpg')
+            file = InputFile(path_or_bytesio=BytesIO(complete.cv_to_bytes(answer.image)), filename=filename)
             await bot.send_document(query.from_user.id, document=file, caption=answer.text,
                                     reply_markup=AnswerButtons)
         else:
@@ -441,7 +448,7 @@ async def get_answer(query: types.CallbackQuery, var=1):
                                  answer.text, reply_markup=AnswerButtons)
 
 
-async def next_answer(query: types.CallbackQuery):
+async def next_answer(query: types.CallbackQuery) -> NotImplemented:
     subject = query.message.caption.split("\n")[0].split(",")[0]
     text_message = query.message.caption.replace(" ", "").lower()
     text_message = text_message.replace("вариантов", "").replace("вариант", "")
@@ -456,12 +463,11 @@ async def next_answer(query: types.CallbackQuery):
         variant = int(variant) + 1
     answers = complete.get_answers(subject, [int(number)], 7, var=variant)
     task_answer = answers[0]
-    cv2.imwrite("img.jpg", task_answer.image)
     await query.message.edit_caption(task_answer.text, reply_markup=AnswerButtons)
     await query.message.edit_media(complete.cv_to_bytes(task_answer.image))
 
 
-def cut_subject(subject, post):
+def cut_subject(subject, post) -> str:
     date = ""
     for line in post.split('\n'):
         if "Всёдз за" in line or "#всёдз за" in line:
@@ -473,7 +479,7 @@ def cut_subject(subject, post):
     for i in subjects:
         if subject in i:
             return date + '\n' + i
-    return
+    return ""
 
 
 if __name__ == '__main__':

@@ -1,11 +1,5 @@
-aiogram~=2.15
-# Comment string below, if you installed opencv-python from your distro repositories
-opencv-python~=4.5.1.48
+aiogram~=2.19
 requests~=2.20.0
-bs4~=0.0.1
 beautifulsoup4~=4.6.3
-aiohttp~=3.7.4.post0
 lxml
 aiosqlite
-numba
-numpy
