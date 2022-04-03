@@ -2,22 +2,23 @@ import aiogram.utils.exceptions
 import config
 import logging
 import dbHandle
-import complete
 import time
 import asyncio
 import random
 from aiogram.types import *
 from aiogram import Bot, Dispatcher, executor, types, filters
 import stickers
-import concurrent.futures
+import answers_api
+import answers_api.data_types
 from io import BytesIO
 
 
-__version__: float = 1.34
+__version__: float = 1.35
 
 logging.basicConfig(level=logging.INFO)
 
 bot: aiogram.bot.Bot = Bot(token=config.API_TOKEN)
+answers_fetcher: answers_api.AnswersAPI = answers_api.AnswersAPI("answers-api-settings.json")
 dp: aiogram.dispatcher.Dispatcher = Dispatcher(bot)
 
 subjects_names: list = [
@@ -312,10 +313,7 @@ async def first_subscribe(query: types.CallbackQuery) -> None:
 @dp.callback_query_handler(lambda c: c.data == "answer")
 async def send_answer(query: types.CallbackQuery) -> None:
     try:
-        if "русский язык:" in query.message.text.lower():
-            await get_answer(query, var=2)
-        else:
-            await get_answer(query)
+        await get_answer(query)
     except Exception as e:
         await bot.send_sticker(query.from_user.id, stickers.answer_error)
         await bot.send_message(query.from_user.id, f"Непредвиденная ошибка: {e}",
@@ -337,12 +335,12 @@ async def forward_report(query: types.CallbackQuery) -> None:
     await bot.answer_callback_query(query.id)
 
 
-def back_cmd(c) -> bool:
+def is_back_cmd(c) -> bool:
     return str(c.data).split("=")[0] == "back" \
            and str(c.data).split("=")[1].isdigit()
 
 
-@dp.callback_query_handler(back_cmd)
+@dp.callback_query_handler(is_back_cmd)
 async def get_prev_task(query: types.CallbackQuery) -> None:
     await get_prev_note(query, query.message)
     await bot.answer_callback_query(query.id)
@@ -378,8 +376,7 @@ async def get_prev_note(query, message: types.Message) -> None:
         if has_answer:
             prev_note = prev_note[1].split("|||")[0]
         print(cut_subject(subject, prev_note[1]))
-        await message.edit_text(cut_subject(subject, prev_note[1]))
-        await message.edit_reply_markup(reply_markup)
+        await message.edit_text(cut_subject(subject, prev_note[1]), reply_markup=reply_markup)
         await query.answer("Вы пролистали все задания")
         return None
     try:
@@ -392,8 +389,7 @@ async def get_prev_note(query, message: types.Message) -> None:
     except Exception as e:
         logging.error(e)
         prev_note = f"Ошибка поиска: {e}"
-    await message.edit_text(prev_note)
-    await message.edit_reply_markup(reply_markup)
+    await message.edit_text(prev_note, reply_markup=reply_markup)
 
 
 async def get_src_task(message: types.Message) -> str:
@@ -404,9 +400,20 @@ async def get_src_task(message: types.Message) -> str:
     return cut_subject(subject, src_note)
 
 
-async def get_answer(query: types.CallbackQuery, var=1) -> None:
+def create_answers_button(answer: answers_api.data_types.Answer):
+    menu: InlineKeyboardButton = InlineKeyboardButton('Меню', callback_data='menu')
+    next_variant: InlineKeyboardButton = InlineKeyboardButton("Далее",
+                                                              callback_data=f"next_variant={answer.id}")
+    close: InlineKeyboardButton = InlineKeyboardButton("Закрыть", callback_data="delete")
+
+    if answer.max_var == 0:
+        return InlineKeyboardMarkup().row(menu, close)
+    else:
+        return InlineKeyboardMarkup().row(menu, next_variant, close)
+
+
+async def get_answer(query: types.CallbackQuery) -> None:
     text_message: str = query.message.text
-    # current_subject: str = ""
 
     for subject in subjects_names:
         if subject in text_message:
@@ -420,51 +427,98 @@ async def get_answer(query: types.CallbackQuery, var=1) -> None:
         numbers = await get_src_task(query.message)
         numbers = numbers.split("|||")[1].replace(" ", "").replace("\n", "").split(",")
     except IndexError:
-        await query.answer("Ошибка: не удалось определить номер задания.")
+        await query.answer("Ошибка: не удалось определить номера заданий.")
         return
-    try:
-        loop = asyncio.get_running_loop()
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            answers = await loop.run_in_executor(
-                pool, complete.get_answers,
-                current_subject, numbers, 7, var
-            )
-        if type(answers) != list:
-            raise answers
-    except Exception as e:
-        await bot.send_sticker(query.from_user.id, stickers.answer_error)
-        await bot.send_message(query.from_user.id,
-                               f"Ошибка сетевого соединения (сервер): {e}",
-                               reply_markup=ErrorButtons)
-        return
-    for answer in answers:
-        if answer.img_height > 840:
+
+    for number in numbers:
+        answer: answers_api.data_types.Answer = answers_api.data_types.Answer()
+        try:
+            answer = await answers_fetcher.get_answer_by_default_preset(current_subject.lower(), number)
+        except answers_api.data_types.AnswerNotFound:
+            await query.answer("Не удалось найти ответ :(")
+        except answers_api.data_types.WrongQuery:
+            await query.answer("Ошибка поиска: предмет не существует")
+
+        caption = ""
+
+        # !
+        if answer.pagination_type.value == answers_api.data_types.PaginationType.by_numbers.value:
+            caption = f"{current_subject.capitalize()}, упражнение {number}\n" \
+                    f"Вариант {answer.var+1} из {answer.max_var+1} вариантов"
+        elif answer.pagination_type.value == answers_api.data_types.PaginationType.by_pages.value:
+            caption = f"{current_subject.capitalize()}, страница {number}\n" \
+                    f"Вариант {answer.var + 1} из {answer.max_var+1} вариантов"
+
+        if answer.is_long:
             filename = time.strftime('%Y%m%d-%H.%M.%S.jpg')
-            file = InputFile(path_or_bytesio=BytesIO(complete.cv_to_bytes(answer.image)), filename=filename)
-            await bot.send_document(query.from_user.id, document=file, caption=answer.text,
-                                    reply_markup=AnswerButtons)
+            file = InputFile(path_or_bytesio=BytesIO(answer.image), filename=filename)
+            await bot.send_document(chat_id=query.from_user.id,
+                                    document=file,
+                                    caption=caption,
+                                    reply_markup=create_answers_button(answer))
         else:
-            await bot.send_photo(query.from_user.id, complete.cv_to_bytes(answer.image),
-                                 answer.text, reply_markup=AnswerButtons)
+            await bot.send_photo(chat_id=query.from_user.id,
+                                 photo=answer.image,
+                                 caption=caption,
+                                 reply_markup=create_answers_button(answer))
 
 
-async def next_answer(query: types.CallbackQuery) -> NotImplemented:
-    subject = query.message.caption.split("\n")[0].split(",")[0]
-    text_message = query.message.caption.replace(" ", "").lower()
-    text_message = text_message.replace("вариантов", "").replace("вариант", "")
-    text_message = text_message.replace("упражнение", "").replace("страница", "")
-    number = text_message.split("\n")[0].split(",")[1].replace("\n", "")
-    variant = text_message.split("\n")[1].split("из")[0]
-    max_variant_value = text_message.split("\n")[1].split("из")[1]
-    print(number)
-    if variant == int(max_variant_value):
-        variant = 1
+def is_next_variant_cmd(c: types.CallbackQuery) -> bool:
+    return c.data.split("=")[0] == "next_variant" and \
+           c.data.split("=")[1].isdigit()
+
+
+@dp.callback_query_handler(is_next_variant_cmd)
+async def next_answer_variant(query: types.CallbackQuery) -> None:
+    current_id = query.data.split("=")[1]
+    new_answer = answers_api.data_types.Answer()
+    current_answer = answers_api.data_types.Answer()
+
+    try:
+        current_answer = await answers_fetcher.get_by_id(current_id)
+        if current_answer.var == current_answer.max_var:
+            new_answer = await answers_fetcher.get_answer(textbook=current_answer.textbook,
+                                                          number=current_answer.number,
+                                                          var=0,
+                                                          class_number=current_answer.class_number,
+                                                          source=current_answer.source)
+            await query.answer("Вы пролистали все варианты", show_alert=False)
+        else:
+            new_answer = await answers_fetcher.get_answer(textbook=current_answer.textbook,
+                                                          number=current_answer.number,
+                                                          var=current_answer.var + 1,
+                                                          class_number=current_answer.class_number,
+                                                          source=current_answer.source)
+    except answers_api.data_types.WrongQuery:
+        await query.answer("Ошибка: неверный запрос")
+        return
+    except Exception as e:
+        logging.error(f"Unknown error (next_answer_variant): {e}")
+        await query.answer("Произошла неизвестная ошибка :(")
+
+    aliases = list(answers_fetcher.config["name_aliases"].keys())
+    textbooks = list(answers_fetcher.config["name_aliases"].values())
+    subject_name = aliases[textbooks.index(current_answer.textbook)]
+    reply_markup = create_answers_button(new_answer)
+    caption: str = ""
+
+    if new_answer.pagination_type.value == answers_api.data_types.PaginationType.by_numbers.value:
+        caption = f"{subject_name.capitalize()}, упражнение {new_answer.number}\n" \
+                  f"Вариант {new_answer.var + 1} из {new_answer.max_var + 1} вариантов"
+    elif new_answer.pagination_type.value == answers_api.data_types.PaginationType.by_pages.value:
+        caption = f"{subject_name.capitalize()}, страница {new_answer.number}\n" \
+                  f"Вариант {new_answer.var + 1} из {new_answer.max_var + 1} вариантов"
+
+    if new_answer.is_long:
+        filename = time.strftime('%Y%m%d-%H.%M.%S.jpg')
+        file = InputFile(path_or_bytesio=BytesIO(new_answer.image), filename=filename)
+        document = InputMediaDocument(media=file, caption=caption)
+        await query.message.edit_media(media=document, reply_markup=reply_markup)
     else:
-        variant = int(variant) + 1
-    answers = complete.get_answers(subject, [int(number)], 7, var=variant)
-    task_answer = answers[0]
-    await query.message.edit_caption(task_answer.text, reply_markup=AnswerButtons)
-    await query.message.edit_media(complete.cv_to_bytes(task_answer.image))
+        file = InputFile(path_or_bytesio=BytesIO(new_answer.image), filename="photo.jpg")
+        image = InputMediaPhoto(media=file, caption=caption)
+        await query.message.edit_media(media=image, reply_markup=reply_markup)
+    await bot.answer_callback_query(query.id)
 
 
 def cut_subject(subject, post) -> str:

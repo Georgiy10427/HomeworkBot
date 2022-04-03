@@ -1,0 +1,22 @@
+{
+  "url": "https://api.gogacoder.com:4305",
+  "name_aliases": {
+    "русский язык": "russkii-yazik-baranova",
+    "алгебра": "nikolskiy-s-m",
+    "геометрия": "atanasyan-7-9",
+    "английский язык": "angliyskiy-v-fokuse-vaulina-yu-e",
+    "география": "geografiya-klimanova"
+  },
+  "default_variants": {
+    "russkii-yazik-baranova": 1,
+    "atanasyan-7-9": 1
+  },
+  "count_by_pages": [
+    "angliyskiy-v-fokuse-vaulina-yu-e",
+    "geografiya-klimanova",
+    "atanasyan-7-9"
+  ],
+  "default_source": "gdz.ru",
+  "long_image_height": 1600,
+  "class_number": 7
+}
